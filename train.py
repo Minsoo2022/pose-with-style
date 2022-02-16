@@ -365,8 +365,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Pose with Style trainer")
 
-    parser.add_argument("path", type=str, help="path to the lmdb dataset")
-    parser.add_argument("--name", type=str, help="name of experiment")
+    parser.add_argument("--path", type=str, default='/home/nas1_temp/dataset/Thuman', help="path to the lmdb dataset")
+    parser.add_argument("--name", type=str, default='test', help="name of experiment")
     parser.add_argument("--epoch", type=int, default=50, help="total training epochs")
     parser.add_argument("--batch", type=int, default=4, help="batch sizes for each gpus")
     parser.add_argument("--workers", type=int, default=4, help="batch sizes for each gpus")
@@ -483,11 +483,12 @@ if __name__ == "__main__":
         )
 
     dataset = DeepFashionDataset(args.path, 'train', args.size)
+    #todo 샘플러 주석 풀기
     sampler = data_sampler(dataset, shuffle=True, distributed=args.distributed)
     loader = data.DataLoader(
         dataset,
         batch_size=args.batch,
-        sampler=sampler,
+        # sampler=sampler,
         drop_last=True,
         pin_memory=True,
         num_workers=args.workers,
