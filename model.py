@@ -510,6 +510,27 @@ class PoseEncoder(nn.Module):
         out = self.convs(input)
         return out
 
+class VolumeEncoder(nn.Module):
+    def __init__(self, ngf=64, blur_kernel=[1, 3, 3, 1], size=256):
+        super().__init__()
+        self.size = size
+        convs = [ConvLayer(32, ngf, 1)]
+        convs.append(ResBlock(ngf, ngf*2, blur_kernel, downsample=False))
+        convs.append(ResBlock(ngf*2, ngf*4, blur_kernel, downsample=False))
+        convs.append(ResBlock(ngf*4, ngf*8, blur_kernel, downsample=False))
+        convs.append(ResBlock(ngf*8, ngf*8, blur_kernel, downsample=False))
+        if self.size == 512:
+            convs.append(ResBlock(ngf*8, ngf*8, blur_kernel))
+        if self.size == 1024:
+            convs.append(ResBlock(ngf*8, ngf*8, blur_kernel))
+            convs.append(ResBlock(ngf*8, ngf*8, blur_kernel))
+
+        self.convs = nn.Sequential(*convs)
+
+    def forward(self, input):
+        out = self.convs(input)
+        return out
+
 
 class SpatialAppearanceEncoder(nn.Module):
     def __init__(self, ngf=64, blur_kernel=[1, 3, 3, 1], size=256):
@@ -604,9 +625,7 @@ class SpatialAppearanceEncoder(nn.Module):
         else:
             return warped_image
 
-    def forward(self, input, pose):
-        coor = input[:,4:,:,:]
-        input = input[:,:4,:,:]
+    def forward(self, input, flow, sil):
 
         x1 = self.conv1(input)
         x2 = self.conv2(x1)
@@ -620,8 +639,8 @@ class SpatialAppearanceEncoder(nn.Module):
             x7 = self.conv7(x6)
 
         # warp- get flow
-        pose_mask = 1-(pose[:,0, :, :] == 0).float().unsqueeze(1)
-        flow = self.uv2target(pose.int(), coor)
+        # todo mask 어떻게 할지
+        # pose_mask = 1-(pose[:,0, :, :] == 0).float().unsqueeze(1)
         # warp- resize flow
         f1 = torch.nn.functional.interpolate(flow, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
         f2 = torch.nn.functional.interpolate(flow, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
@@ -646,16 +665,16 @@ class SpatialAppearanceEncoder(nn.Module):
             x7 = torch.nn.functional.grid_sample(x7, f7.permute(0,2,3,1))
 
         # mask features
-        p1 = torch.nn.functional.interpolate(pose_mask, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
-        p2 = torch.nn.functional.interpolate(pose_mask, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
-        p3 = torch.nn.functional.interpolate(pose_mask, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
-        p4 = torch.nn.functional.interpolate(pose_mask, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
-        p5 = torch.nn.functional.interpolate(pose_mask, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
+        p1 = torch.nn.functional.interpolate(sil, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
+        p2 = torch.nn.functional.interpolate(sil, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
+        p3 = torch.nn.functional.interpolate(sil, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
+        p4 = torch.nn.functional.interpolate(sil, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
+        p5 = torch.nn.functional.interpolate(sil, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
         if self.size == 512:
-            p6 = torch.nn.functional.interpolate(pose_mask, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
+            p6 = torch.nn.functional.interpolate(sil, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
         if self.size == 1024:
-            p6 = torch.nn.functional.interpolate(pose_mask, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-            p7 = torch.nn.functional.interpolate(pose_mask, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
+            p6 = torch.nn.functional.interpolate(sil, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
+            p7 = torch.nn.functional.interpolate(sil, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
 
         x1 = x1 * p1
         x2 = x2 * p2
@@ -737,6 +756,7 @@ class Generator(nn.Module):
         else:
             self.appearance_encoder = SpatialAppearanceEncoder(size=size)
         self.pose_encoder = PoseEncoder(size=size)
+        self.vol_encoder = VolumeEncoder(size=size)
 
         # StyleGAN
         self.channels = {
@@ -812,8 +832,10 @@ class Generator(nn.Module):
 
     def forward(
         self,
-        pose,
+        flow,
         appearance,
+        sil,
+        vol_feature,
         styles=None,
         return_latents=False,
         inject_index=None,
@@ -825,9 +847,9 @@ class Generator(nn.Module):
     ):
 
         if self.garment_transfer:
-            styles, part_mask = self.appearance_encoder(appearance, pose)
+            styles, part_mask = self.appearance_encoder(appearance, flow, sil)
         else:
-            styles = self.appearance_encoder(appearance, pose)
+            styles = self.appearance_encoder(appearance, flow, sil)
 
         if noise is None:
             if randomize_noise:
@@ -847,7 +869,7 @@ class Generator(nn.Module):
         for i in range(length):
             latent += [styles[i+1],styles[i+1]]
 
-        out = self.pose_encoder(pose)
+        out = self.vol_encoder(vol_feature)
         out = self.conv1(out, latent[0], noise=noise[0])
         skip = self.to_rgb1(out, latent[1])
 
@@ -917,14 +939,14 @@ class ConvLayer(nn.Sequential):
 
 
 class ResBlock(nn.Module):
-    def __init__(self, in_channel, out_channel, blur_kernel=[1, 3, 3, 1]):
+    def __init__(self, in_channel, out_channel, blur_kernel=[1, 3, 3, 1], downsample=True):
         super().__init__()
 
         self.conv1 = ConvLayer(in_channel, in_channel, 3)
-        self.conv2 = ConvLayer(in_channel, out_channel, 3, downsample=True)
+        self.conv2 = ConvLayer(in_channel, out_channel, 3, downsample=downsample)
 
         self.skip = ConvLayer(
-            in_channel, out_channel, 1, downsample=True, activate=False, bias=False
+            in_channel, out_channel, 1, downsample=downsample, activate=False, bias=False
         )
 
     def forward(self, input):
@@ -953,7 +975,7 @@ class Discriminator(nn.Module):
             1024: 16 * channel_multiplier,
         }
 
-        convs = [ConvLayer(6, channels[size], 1)]
+        convs = [ConvLayer(5, channels[size], 1)]
 
         log_size = int(math.log(size, 2))
 
@@ -977,8 +999,8 @@ class Discriminator(nn.Module):
             EqualLinear(channels[4], 1),
         )
 
-    def forward(self, input, pose):
-        input = torch.cat([input, pose], 1)
+    def forward(self, input, flow):
+        input = torch.cat([input, flow], 1)
         out = self.convs(input)
 
         batch, channel, height, width = out.shape

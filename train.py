@@ -177,11 +177,15 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
 
             input_image = data['input_image'].float().to(device)
             real_img = data['target_image'].float().to(device)
-            pose = data['target_pose'].float().to(device)
+            flow = data['flow'].float().to(device)
             sil = data['target_sil'].float().to(device)
+            feature = data['feature'].float().to(device)
 
             LeftPad = data['target_left_pad'].float().to(device)
             RightPad = data['target_right_pad'].float().to(device)
+
+            #todo flow 배경부분에 왜 값이 있는지 확인 0.0039정도 있음
+            flow = F.interpolate(flow, args.size)
 
             if args.faceloss:
                 FT = data['TargetFaceTransform'].float().to(device)
@@ -199,24 +203,25 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
 
             # appearance = human foregound + fg mask (pass coor for warping)
             source_sil = data['input_sil'].float().to(device)
-            complete_coor = data['complete_coor'].float().to(device)
-            if args.size == 256:
-                complete_coor = torch.nn.functional.interpolate(complete_coor, size=(256, 256), mode='bilinear')
+            # complete_coor = data['complete_coor'].float().to(device)
+            # if args.size == 256:
+            #     complete_coor = torch.nn.functional.interpolate(complete_coor, size=(256, 256), mode='bilinear')
             if args.finetune:
-                appearance = torch.cat([input_image, source_sil, complete_coor], 1)
+                appearance = torch.cat([input_image, source_sil], 1)
             else:
-                appearance = torch.cat([input_image * source_sil, source_sil, complete_coor], 1)
+                appearance = torch.cat([input_image * source_sil, source_sil], 1)
 
 
             ############ Optimize Discriminator ############
             requires_grad(generator, False)
             requires_grad(discriminator, True)
 
-            fake_img, _ = generator(appearance=appearance, pose=pose)
+            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, vol_feature=feature)
             fake_img = fake_img * sil
 
-            fake_pred = discriminator(fake_img, pose=pose)
-            real_pred = discriminator(real_img, pose=pose)
+            #todo 디스크리미네이터 어떤걸 concat할지
+            fake_pred = discriminator(fake_img, flow=flow)
+            real_pred = discriminator(real_img, flow=flow)
             d_loss = d_logistic_loss(real_pred, fake_pred)
 
             loss_dict["d"] = d_loss
@@ -233,7 +238,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             if d_regularize:
                 real_img.requires_grad = True
 
-                real_pred = discriminator(real_img, pose=pose)
+                real_pred = discriminator(real_img, flow=flow)
                 r1_loss = d_r1_loss(real_pred, real_img)
 
                 discriminator.zero_grad()
@@ -248,10 +253,10 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             requires_grad(generator, True)
             requires_grad(discriminator, False)
 
-            fake_img, _ = generator(appearance=appearance, pose=pose)
+            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, vol_feature=feature)
             fake_img = fake_img * sil
 
-            fake_pred = discriminator(fake_img, pose=pose)
+            fake_pred = discriminator(fake_img, flow=flow)
             g_loss = g_nonsaturating_loss(fake_pred)
 
             loss_dict["g"] = g_loss
@@ -320,7 +325,8 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                 if i % 5000 == 0:
                     with torch.no_grad():
                         g_ema.eval()
-                        sample, _ = g_ema(appearance=appearance[:args.n_sample], pose=pose[:args.n_sample])
+                        sample, _ = g_ema(appearance=appearance[:args.n_sample], flow=flow[:args.n_sample],
+                                          sil=sil[:args.n_sample], vol_feature=feature[:args.n_sample])
                         sample = sample * sil
                         utils.save_image(
                             sample,
@@ -392,12 +398,15 @@ if __name__ == "__main__":
     parser.add_argument("--local_rank", type=int, default=0, help="local rank for distributed training")
     parser.add_argument("--faceloss", action="store_true", help="add face loss when faces are detected")
     parser.add_argument("--finetune", action="store_true", help="finetune to handle background- second step of training.")
-
+    # parser.add_argument("--gpu_ids", type=str, default=0, help="add face loss when faces are detected")
 
     args = parser.parse_args()
 
     n_gpu = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
+    # gpu_ids = args.gpu_ids.split(',')
+    # n_gpu = len(gpu_ids)
     args.distributed = n_gpu > 1
+    # os.environ["CUDA_VISIBLE_DEVICES"] = (',').join(gpu_ids)
 
     if args.distributed:
         print ('Distributed Training Mode.')
@@ -483,12 +492,11 @@ if __name__ == "__main__":
         )
 
     dataset = DeepFashionDataset(args.path, 'train', args.size)
-    #todo 샘플러 주석 풀기
     sampler = data_sampler(dataset, shuffle=True, distributed=args.distributed)
     loader = data.DataLoader(
         dataset,
         batch_size=args.batch,
-        # sampler=sampler,
+        sampler=sampler,
         drop_last=True,
         pin_memory=True,
         num_workers=args.workers,
