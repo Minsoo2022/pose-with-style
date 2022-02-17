@@ -975,7 +975,7 @@ class Discriminator(nn.Module):
             1024: 16 * channel_multiplier,
         }
 
-        convs = [ConvLayer(5, channels[size], 1)]
+        convs = [ConvLayer(6, channels[size], 1)]
 
         log_size = int(math.log(size, 2))
 
@@ -999,8 +999,8 @@ class Discriminator(nn.Module):
             EqualLinear(channels[4], 1),
         )
 
-    def forward(self, input, flow):
-        input = torch.cat([input, flow], 1)
+    def forward(self, input, condition):
+        input = torch.cat([input, condition], 1)
         out = self.convs(input)
 
         batch, channel, height, width = out.shape

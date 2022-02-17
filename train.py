@@ -220,8 +220,8 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             fake_img = fake_img * sil
 
             #todo 디스크리미네이터 어떤걸 concat할지
-            fake_pred = discriminator(fake_img, flow=flow)
-            real_pred = discriminator(real_img, flow=flow)
+            fake_pred = discriminator(fake_img, condition=input_image * source_sil)
+            real_pred = discriminator(real_img, condition=input_image * source_sil)
             d_loss = d_logistic_loss(real_pred, fake_pred)
 
             loss_dict["d"] = d_loss
@@ -238,7 +238,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             if d_regularize:
                 real_img.requires_grad = True
 
-                real_pred = discriminator(real_img, flow=flow)
+                real_pred = discriminator(real_img, condition=input_image * source_sil)
                 r1_loss = d_r1_loss(real_pred, real_img)
 
                 discriminator.zero_grad()
@@ -256,7 +256,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, vol_feature=feature)
             fake_img = fake_img * sil
 
-            fake_pred = discriminator(fake_img, flow=flow)
+            fake_pred = discriminator(fake_img, condition=input_image * source_sil)
             g_loss = g_nonsaturating_loss(fake_pred)
 
             loss_dict["g"] = g_loss
@@ -322,7 +322,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                         }
                     )
 
-                if i % 5000 == 0:
+                if i % 1000 == 0:
                     with torch.no_grad():
                         g_ema.eval()
                         sample, _ = g_ema(appearance=appearance[:args.n_sample], flow=flow[:args.n_sample],
@@ -331,6 +331,20 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                         utils.save_image(
                             sample,
                             os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=True,
+                            range=(-1, 1),
+                        )
+                        utils.save_image(
+                            input_image[:args.n_sample],
+                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_source.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=True,
+                            range=(-1, 1),
+                        )
+                        utils.save_image(
+                            real_img[:args.n_sample],
+                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_target.png"),
                             nrow=int(args.n_sample ** 0.5),
                             normalize=True,
                             range=(-1, 1),

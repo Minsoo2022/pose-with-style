@@ -278,6 +278,8 @@ class DeepFashionDataset(Dataset):
 
         # return data
         if self.phase == 'train':
+            save_name = str(model_id).zfill(4) + '_' + str(source_view_id).zfill(4) + '_2_' + str(source_view_id).zfill(
+                4) + '_vis.png'
             return {'input_image':input_image, 'target_image':target_im,
                     'target_sil': target_sil,
                     'flow': flow,
@@ -286,10 +288,11 @@ class DeepFashionDataset(Dataset):
                     'target_left_pad':torch.tensor(target_left_pad),
                     'target_right_pad':torch.tensor(target_right_pad),
                     'input_sil': silhouette1,
+                    'save_name': save_name
                     }
 
         if self.phase == 'test':
-            save_name = str(model_id).zfill(4) + '/' + str(source_view_id).zfill(4) + '_2_' + str(source_view_id).zfill(4) + '_vis.png'
+            save_name = str(model_id).zfill(4) + '_' + str(source_view_id).zfill(4) + '_2_' + str(source_view_id).zfill(4) + '_vis.png'
             return {'input_image':input_image, 'target_image':target_im,
                     'target_sil': target_sil,
                     'target_left_pad':torch.tensor(target_left_pad),
