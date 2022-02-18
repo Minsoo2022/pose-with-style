@@ -10,11 +10,12 @@ import pickle
 import cv2 as cv
 
 class DeepFashionDataset(Dataset):
-    def __init__(self, path, phase, size):
+    def __init__(self, path, phase, size, vol_feat_res=32):
         # path = /home/nas1_temp/dataset/Thuman
         self.path = path
         self.phase = phase  # train or test
         self.size = size    # 256 or 512  FOR  174x256 or 348x512
+        self.vol_feat_res = vol_feat_res
 
         # set root directories
         self.image_root = os.path.join(path, 'DeepFashion_highres', phase)
@@ -117,13 +118,13 @@ class DeepFashionDataset(Dataset):
         #todo msk 벨류 확인
         return img, msk
 
-    def load_stage1_output(self, data_item, source_view_id, target_view_id, feature_size=32):
+    def load_stage1_output(self, data_item, source_view_id, target_view_id, vol_feat_res):
         flow_fpath = os.path.join(
             self.path, 'output_stage1', 'nerf_flowvr_0215_maskloss_', str(data_item).zfill(4),
             'flow/%04d_%04d.png' % (source_view_id, target_view_id))
         feature_fpath = os.path.join(
             self.path, 'output_stage1', 'nerf_flowvr_0215_maskloss_', str(data_item).zfill(4),
-            'feature/%s/%04d_%04d.npy' % (str(feature_size), source_view_id, target_view_id))
+            'feature/%s/%04d_%04d.npy' % (str(vol_feat_res), source_view_id, target_view_id))
         try:
             flow = Image.open(flow_fpath)
             feature = np.load(feature_fpath)
@@ -177,7 +178,7 @@ class DeepFashionDataset(Dataset):
             # silhouette1 = 1-((1-silhouette1) * (input_densepose[:, :, 0] == 0).astype('float'))
             input_image, silhouette1 = self.load_image(model_id, source_view_id)
             target_image, silhouette2 = self.load_image(model_id, target_view_id)
-            flow, feature = self.load_stage1_output(model_id, source_view_id, target_view_id)
+            flow, feature = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
 
         else:
             # input_image = self.resize_height_PIL(input_image_pil, self.size)
@@ -193,7 +194,7 @@ class DeepFashionDataset(Dataset):
             # silhouette2 = 1-((1-silhouette2) * (target_densepose[:, :, 0] == 0).astype('float'))
             input_image, silhouette1 = self.load_image(model_id, source_view_id)
             target_image, silhouette2 = self.load_image(model_id, target_view_id)
-            flow, feature = self.load_stage1_output(model_id, source_view_id, target_view_id)
+            flow, feature = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
 
         # read uv-space data
         # complete_coor = np.load(complete_coor_path)

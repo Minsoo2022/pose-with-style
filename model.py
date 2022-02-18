@@ -511,14 +511,23 @@ class PoseEncoder(nn.Module):
         return out
 
 class VolumeEncoder(nn.Module):
-    def __init__(self, ngf=64, blur_kernel=[1, 3, 3, 1], size=256):
+    def __init__(self, ngf=64, blur_kernel=[1, 3, 3, 1], size=256, vol_feat_res=32):
         super().__init__()
         self.size = size
         convs = [ConvLayer(32, ngf, 1)]
-        convs.append(ResBlock(ngf, ngf*2, blur_kernel, downsample=False))
-        convs.append(ResBlock(ngf*2, ngf*4, blur_kernel, downsample=False))
-        convs.append(ResBlock(ngf*4, ngf*8, blur_kernel, downsample=False))
-        convs.append(ResBlock(ngf*8, ngf*8, blur_kernel, downsample=False))
+        if vol_feat_res == 32:
+            convs.append(ResBlock(ngf, ngf*2, blur_kernel, downsample=False))
+            convs.append(ResBlock(ngf*2, ngf*4, blur_kernel, downsample=False))
+        elif vol_feat_res == 64:
+            convs.append(ResBlock(ngf, ngf*2, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf*2, ngf*4, blur_kernel, downsample=False))
+        elif vol_feat_res == 128:
+            convs.append(ResBlock(ngf, ngf * 2, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 2, ngf * 4, blur_kernel, downsample=True))
+        else:
+            raise NotImplementedError()
+        # convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=False))
+        convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=False))
         if self.size == 512:
             convs.append(ResBlock(ngf*8, ngf*8, blur_kernel))
         if self.size == 1024:
@@ -739,6 +748,7 @@ class Generator(nn.Module):
         size,
         style_dim,
         n_mlp,
+        vol_feat_res=32,
         channel_multiplier=2,
         blur_kernel=[1, 3, 3, 1],
         lr_mlp=0.01,
@@ -756,7 +766,7 @@ class Generator(nn.Module):
         else:
             self.appearance_encoder = SpatialAppearanceEncoder(size=size)
         self.pose_encoder = PoseEncoder(size=size)
-        self.vol_encoder = VolumeEncoder(size=size)
+        self.vol_encoder = VolumeEncoder(size=size, vol_feat_res=vol_feat_res)
 
         # StyleGAN
         self.channels = {
@@ -1003,6 +1013,106 @@ class Discriminator(nn.Module):
         input = torch.cat([input, condition], 1)
         out = self.convs(input)
 
+        batch, channel, height, width = out.shape
+        group = min(batch, self.stddev_group)
+        stddev = out.view(
+            group, -1, self.stddev_feat, channel // self.stddev_feat, height, width
+        )
+        stddev = torch.sqrt(stddev.var(0, unbiased=False) + 1e-8)
+        stddev = stddev.mean([2, 3, 4], keepdims=True).squeeze(2)
+        stddev = stddev.repeat(group, 1, height, width)
+        out = torch.cat([out, stddev], 1)
+
+        out = self.final_conv(out)
+
+        out = out.view(batch, -1)
+        out = self.final_linear(out)
+
+        return out
+
+
+class Discriminator_sub(nn.Module):
+    def __init__(self, size, channel_multiplier=2, blur_kernel=[1, 3, 3, 1], vol_feat_res=128):
+        super().__init__()
+        channels = {
+            4: 512,
+            8: 512,
+            16: 512,
+            32: 512,
+            64: 256 * channel_multiplier,
+            128: 128 * channel_multiplier,
+            256: 64 * channel_multiplier,
+            512: 32 * channel_multiplier,
+            1024: 16 * channel_multiplier,
+        }
+        self.vol_feat_res = vol_feat_res
+        in_channel = channels[vol_feat_res]
+        vol_convs = [ConvLayer(32, channels[vol_feat_res], 1)]
+        for i in range(int(math.log(vol_feat_res, 2)), 5, -1):
+            out_channel = channels[2 ** (i -1)]
+            vol_convs.append(ResBlock(in_channel, out_channel, blur_kernel))
+            in_channel = out_channel
+        self.vol_convs = nn.Sequential(*vol_convs)
+
+        self.convs = nn.ModuleList()
+        self.convs.append(ConvLayer(3, channels[size], 1))
+
+        log_size = int(math.log(size, 2))
+
+        in_channel = channels[size]
+
+        for i in range(log_size, 2, -1): # 9 8 7 6 5 4 3
+            out_channel = channels[2 ** (i - 1)]
+            if i == 5:
+                ch_vol_feat = 512
+            else:
+                ch_vol_feat = 0
+            self.convs.append(ResBlock(in_channel + ch_vol_feat, out_channel, blur_kernel))
+
+            in_channel = out_channel
+
+
+    def forward(self, x, condition):
+        condition = self.vol_convs(condition)
+        for i, layer in enumerate(self.convs):
+            if i == 0:
+                out = layer(x)
+            else:
+                if out.size(2) == 32:
+                    out = layer(torch.cat([out, condition],dim=1))
+                else:
+                    out = layer(out)
+        return out
+
+class Discriminator_feat(nn.Module):
+    def __init__(self, size, channel_multiplier=2, blur_kernel=[1, 3, 3, 1], vol_feat_res=128):
+        super().__init__()
+
+        self.sub_block = Discriminator_sub(size, channel_multiplier=2, blur_kernel=[1, 3, 3, 1], vol_feat_res=vol_feat_res)
+
+        self.stddev_group = 4
+        self.stddev_feat = 1
+
+        channels = {
+            4: 512,
+            8: 512,
+            16: 512,
+            32: 512,
+            64: 256 * channel_multiplier,
+            128: 128 * channel_multiplier,
+            256: 64 * channel_multiplier,
+            512: 32 * channel_multiplier,
+            1024: 16 * channel_multiplier,
+        }
+
+        self.final_conv = ConvLayer(channels[8] + 1, channels[4], 3)
+        self.final_linear = nn.Sequential(
+            EqualLinear(channels[4] * 4 * 4, channels[4], activation="fused_lrelu"),
+            EqualLinear(channels[4], 1),
+        )
+
+    def forward(self, input, condition):
+        out = self.sub_block(input, condition)
         batch, channel, height, width = out.shape
         group = min(batch, self.stddev_group)
         stddev = out.view(

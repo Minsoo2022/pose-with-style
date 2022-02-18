@@ -14,7 +14,7 @@ from tqdm import tqdm
 import time
 
 from dataset import DeepFashionDataset
-from model import Generator, Discriminator, VGGLoss
+from model import Generator, Discriminator, VGGLoss, Discriminator_feat
 
 try:
     import wandb
@@ -220,8 +220,8 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             fake_img = fake_img * sil
 
             #todo 디스크리미네이터 어떤걸 concat할지
-            fake_pred = discriminator(fake_img, condition=input_image * source_sil)
-            real_pred = discriminator(real_img, condition=input_image * source_sil)
+            fake_pred = discriminator(fake_img, condition=feature)
+            real_pred = discriminator(real_img, condition=feature)
             d_loss = d_logistic_loss(real_pred, fake_pred)
 
             loss_dict["d"] = d_loss
@@ -238,7 +238,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             if d_regularize:
                 real_img.requires_grad = True
 
-                real_pred = discriminator(real_img, condition=input_image * source_sil)
+                real_pred = discriminator(real_img, condition=feature)
                 r1_loss = d_r1_loss(real_pred, real_img)
 
                 discriminator.zero_grad()
@@ -256,7 +256,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, vol_feature=feature)
             fake_img = fake_img * sil
 
-            fake_pred = discriminator(fake_img, condition=input_image * source_sil)
+            fake_pred = discriminator(fake_img, condition=feature)
             g_loss = g_nonsaturating_loss(fake_pred)
 
             loss_dict["g"] = g_loss
@@ -392,6 +392,7 @@ if __name__ == "__main__":
     parser.add_argument("--workers", type=int, default=4, help="batch sizes for each gpus")
     parser.add_argument("--n_sample", type=int, default=4, help="number of the samples generated during training")
     parser.add_argument("--size", type=int, default=512, help="image sizes for the model")
+    parser.add_argument("--vol_feat_res", type=int, default=128, help="resolution of volume feature")
     parser.add_argument("--r1", type=float, default=10, help="weight of the r1 regularization")
     parser.add_argument("--channel_multiplier", type=int, default=2, help="channel multiplier factor for the model. config-f = 2, else = 1")
     parser.add_argument(
@@ -445,9 +446,9 @@ if __name__ == "__main__":
         sys.exit()
 
     # define models
-    generator = Generator(args.size, args.latent, args.n_mlp, channel_multiplier=args.channel_multiplier).to(device)
-    discriminator = Discriminator(args.size, channel_multiplier=args.channel_multiplier).to(device)
-    g_ema = Generator(args.size, args.latent, args.n_mlp, channel_multiplier=args.channel_multiplier).to(device)
+    generator = Generator(args.size, args.latent, args.n_mlp, args.vol_feat_res, channel_multiplier=args.channel_multiplier).to(device)
+    discriminator = Discriminator_feat(args.size, channel_multiplier=args.channel_multiplier, vol_feat_res= args.vol_feat_res).to(device)
+    g_ema = Generator(args.size, args.latent, args.n_mlp, args.vol_feat_res, channel_multiplier=args.channel_multiplier).to(device)
     g_ema.eval()
     accumulate(g_ema, generator, 0)
 
@@ -505,7 +506,7 @@ if __name__ == "__main__":
             broadcast_buffers=False,
         )
 
-    dataset = DeepFashionDataset(args.path, 'train', args.size)
+    dataset = DeepFashionDataset(args.path, 'train', args.size, args.vol_feat_res)
     sampler = data_sampler(dataset, shuffle=True, distributed=args.distributed)
     loader = data.DataLoader(
         dataset,
