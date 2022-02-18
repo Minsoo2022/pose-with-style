@@ -181,6 +181,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             sil = data['target_sil'].float().to(device)
             feature = data['feature'].float().to(device)
             pred_img = data['pred_image'].float().to(device)
+            attention = data['attention'].float().to(device)
 
             LeftPad = data['target_left_pad'].float().to(device)
             RightPad = data['target_right_pad'].float().to(device)
@@ -217,7 +218,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             requires_grad(generator, False)
             requires_grad(discriminator, True)
 
-            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, pred_image=pred_img, vol_feature=feature)
+            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, pred_image=pred_img, vol_feature=feature, attention=attention)
             fake_img = fake_img * sil
 
             #todo 디스크리미네이터 어떤걸 concat할지
@@ -254,7 +255,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             requires_grad(generator, True)
             requires_grad(discriminator, False)
 
-            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, pred_image=pred_img, vol_feature=feature)
+            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, pred_image=pred_img, vol_feature=feature, attention=attention)
             fake_img = fake_img * sil
 
             fake_pred = discriminator(fake_img, condition=input_image * source_sil)
@@ -323,12 +324,12 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                         }
                     )
 
-                if i % 1000 == 0:
+                if i % 500 == 0:
                     with torch.no_grad():
                         g_ema.eval()
                         sample, _ = g_ema(appearance=appearance[:args.n_sample], flow=flow[:args.n_sample],
                                           sil=sil[:args.n_sample], pred_image=pred_img[:args.n_sample],
-                                          vol_feature=feature[:args.n_sample])
+                                          vol_feature=feature[:args.n_sample], attention=attention[:args.n_sample])
                         sample = sample * sil
                         utils.save_image(
                             sample,
