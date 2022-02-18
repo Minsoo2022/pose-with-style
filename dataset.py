@@ -120,18 +120,22 @@ class DeepFashionDataset(Dataset):
 
     def load_stage1_output(self, data_item, source_view_id, target_view_id, vol_feat_res):
         flow_fpath = os.path.join(
-            self.path, 'output_stage1', 'nerf_flowvr_0215_maskloss_', str(data_item).zfill(4),
+            self.path, 'output_stage1', 'pamir_nerf_0213_1000_48_03_rayontarget_rayonpts_att', str(data_item).zfill(4),
             'flow/%04d_%04d.png' % (source_view_id, target_view_id))
+        pred_image_fpath = os.path.join(
+            self.path, 'output_stage1', 'pamir_nerf_0213_1000_48_03_rayontarget_rayonpts_att', str(data_item).zfill(4),
+            'pred_image/%04d_%04d.png' % (source_view_id, target_view_id))
         feature_fpath = os.path.join(
-            self.path, 'output_stage1', 'nerf_flowvr_0215_maskloss_', str(data_item).zfill(4),
+            self.path, 'output_stage1', 'pamir_nerf_0213_1000_48_03_rayontarget_rayonpts_att', str(data_item).zfill(4),
             'feature/%s/%04d_%04d.npy' % (str(vol_feat_res), source_view_id, target_view_id))
         try:
             flow = Image.open(flow_fpath)
+            pred_image = Image.open(pred_image_fpath)
             feature = np.load(feature_fpath)
         except:
             print(feature_fpath)
             raise RuntimeError('Failed to load stage1 output: ' + flow_fpath)
-        return flow, feature
+        return flow, pred_image, feature
 
 
     def __getitem__(self, index):
@@ -178,7 +182,7 @@ class DeepFashionDataset(Dataset):
             # silhouette1 = 1-((1-silhouette1) * (input_densepose[:, :, 0] == 0).astype('float'))
             input_image, silhouette1 = self.load_image(model_id, source_view_id)
             target_image, silhouette2 = self.load_image(model_id, target_view_id)
-            flow, feature = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
+            flow, pred_image, feature = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
 
         else:
             # input_image = self.resize_height_PIL(input_image_pil, self.size)
@@ -194,7 +198,7 @@ class DeepFashionDataset(Dataset):
             # silhouette2 = 1-((1-silhouette2) * (target_densepose[:, :, 0] == 0).astype('float'))
             input_image, silhouette1 = self.load_image(model_id, source_view_id)
             target_image, silhouette2 = self.load_image(model_id, target_view_id)
-            flow, feature = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
+            flow, pred_image, feature = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
 
         # read uv-space data
         # complete_coor = np.load(complete_coor_path)
@@ -203,6 +207,7 @@ class DeepFashionDataset(Dataset):
         input_image = self.transform(input_image)
         target_image = self.transform(target_image)
         flow = self.transform(flow)[:2]
+        pred_image = self.transform(pred_image)
         silhouette1 = self.totensor(silhouette1)
         silhouette2 = self.totensor(silhouette2)
         # Dense Pose
@@ -281,7 +286,7 @@ class DeepFashionDataset(Dataset):
         if self.phase == 'train':
             save_name = str(model_id).zfill(4) + '_' + str(source_view_id).zfill(4) + '_2_' + str(source_view_id).zfill(
                 4) + '_vis.png'
-            return {'input_image':input_image, 'target_image':target_im,
+            return {'input_image':input_image, 'target_image':target_im, 'pred_image': pred_image,
                     'target_sil': target_sil,
                     'flow': flow,
                     'feature': feature,
@@ -294,7 +299,7 @@ class DeepFashionDataset(Dataset):
 
         if self.phase == 'test':
             save_name = str(model_id).zfill(4) + '_' + str(source_view_id).zfill(4) + '_2_' + str(source_view_id).zfill(4) + '_vis.png'
-            return {'input_image':input_image, 'target_image':target_im,
+            return {'input_image':input_image, 'target_image':target_im, 'pred_image': pred_image,
                     'target_sil': target_sil,
                     'target_left_pad':torch.tensor(target_left_pad),
                     'target_right_pad':torch.tensor(target_right_pad),

@@ -510,24 +510,28 @@ class PoseEncoder(nn.Module):
         out = self.convs(input)
         return out
 
-class VolumeEncoder(nn.Module):
-    def __init__(self, ngf=64, blur_kernel=[1, 3, 3, 1], size=256, vol_feat_res=32):
+class PredimgEncoder(nn.Module):
+    def __init__(self, ngf=64, blur_kernel=[1, 3, 3, 1], size=256, img_res=256):
         super().__init__()
         self.size = size
-        convs = [ConvLayer(32, ngf, 1)]
-        if vol_feat_res == 32:
-            convs.append(ResBlock(ngf, ngf*2, blur_kernel, downsample=False))
-            convs.append(ResBlock(ngf*2, ngf*4, blur_kernel, downsample=False))
-        elif vol_feat_res == 64:
-            convs.append(ResBlock(ngf, ngf*2, blur_kernel, downsample=True))
-            convs.append(ResBlock(ngf*2, ngf*4, blur_kernel, downsample=False))
-        elif vol_feat_res == 128:
+        convs = [ConvLayer(3, ngf, 1)]
+        if img_res == 128:
             convs.append(ResBlock(ngf, ngf * 2, blur_kernel, downsample=True))
             convs.append(ResBlock(ngf * 2, ngf * 4, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=False))
+            convs.append(ResBlock(ngf * 8, ngf * 8, blur_kernel, downsample=False))
+        elif img_res == 256:
+            convs.append(ResBlock(ngf, ngf * 2, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 2, ngf * 4, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 8, ngf * 8, blur_kernel, downsample=False))
+        elif img_res == 512:
+            convs.append(ResBlock(ngf, ngf * 2, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 2, ngf * 4, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 8, ngf * 8, blur_kernel, downsample=True))
         else:
             raise NotImplementedError()
-        # convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=False))
-        convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=False))
         if self.size == 512:
             convs.append(ResBlock(ngf*8, ngf*8, blur_kernel))
         if self.size == 1024:
@@ -547,6 +551,7 @@ class SpatialAppearanceEncoder(nn.Module):
         self.size = size
         self.dp_uv_lookup_256_np = np.load('util/dp_uv_lookup_256.npy')
         input_nc = 4 # source RGB and sil
+        input_vol_nc = 32
 
         self.conv1 = ConvLayer(input_nc, ngf, 1)                #  ngf 256 256
         self.conv2 = ResBlock(ngf, ngf*2, blur_kernel)          # 2ngf 128 128
@@ -561,11 +566,11 @@ class SpatialAppearanceEncoder(nn.Module):
 
         self.conv11 = EqualConv2d(ngf+1, ngf*8, 1)
         self.conv21 = EqualConv2d(ngf*2+1, ngf*8, 1)
-        self.conv31 = EqualConv2d(ngf*4+1, ngf*8, 1)
-        self.conv41 = EqualConv2d(ngf*8+1, ngf*8, 1)
-        self.conv51 = EqualConv2d(ngf*8+1, ngf*8, 1)
+        self.conv31 = EqualConv2d(ngf*4+ngf+1, ngf*8, 1)
+        self.conv41 = EqualConv2d(ngf*8+ngf*2+1, ngf*8, 1)
+        self.conv51 = EqualConv2d(ngf*8+ngf*4+1, ngf*8, 1)
         if self.size == 512:
-            self.conv61 = EqualConv2d(ngf*8+1, ngf*8, 1)
+            self.conv61 = EqualConv2d(ngf*8+ngf*8+1, ngf*8, 1)
         if self.size == 1024:
             self.conv61 = EqualConv2d(ngf*8+1, ngf*8, 1)
             self.conv71 = EqualConv2d(ngf*8+1, ngf*8, 1)
@@ -588,6 +593,12 @@ class SpatialAppearanceEncoder(nn.Module):
             self.conv23 = EqualConv2d(ngf*8, ngf*4, 3, padding=1)
             self.conv33 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
             self.conv43 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
+
+        self.volconv1 = ConvLayer(input_vol_nc, ngf, 1)            # 128 128
+        self.volconv2 = ResBlock(ngf, ngf*2, blur_kernel)          # 64 64
+        self.volconv3 = ResBlock(ngf*2, ngf*4, blur_kernel)        # 32 32
+        self.volconv4 = ResBlock(ngf*4, ngf*8, blur_kernel)        # 16 16
+
 
         self.up = nn.Upsample(scale_factor=2)
 
@@ -634,7 +645,7 @@ class SpatialAppearanceEncoder(nn.Module):
         else:
             return warped_image
 
-    def forward(self, input, flow, sil):
+    def forward(self, input, flow, sil, vol_feature):
 
         x1 = self.conv1(input)
         x2 = self.conv2(x1)
@@ -696,6 +707,11 @@ class SpatialAppearanceEncoder(nn.Module):
             x6 = x6 * p6
             x7 = x7 * p7
 
+        v3 = self.volconv1(vol_feature)
+        v4 = self.volconv2(v3)
+        v5 = self.volconv3(v4)
+        v6 = self.volconv4(v5)
+
         # fpn
         if self.size == 1024:
             F7 = self.conv71(torch.cat([x7,p7], 1))
@@ -712,12 +728,12 @@ class SpatialAppearanceEncoder(nn.Module):
             f1 = self.up(f2)+self.conv11(torch.cat([x1,p1], 1))
             F1 = self.conv13(f1)
         elif self.size == 512:
-            F6 = self.conv61(torch.cat([x6,p6], 1))
-            f5 = self.up(F6)+self.conv51(torch.cat([x5,p5], 1))
+            F6 = self.conv61(torch.cat([x6,p6,v6], 1))
+            f5 = self.up(F6)+self.conv51(torch.cat([x5,p5,v5], 1))
             F5 = self.conv53(f5)
-            f4 = self.up(f5)+self.conv41(torch.cat([x4,p4], 1))
+            f4 = self.up(f5)+self.conv41(torch.cat([x4,p4,v4], 1))
             F4 = self.conv43(f4)
-            f3 = self.up(f4)+self.conv31(torch.cat([x3,p3], 1))
+            f3 = self.up(f4)+self.conv31(torch.cat([x3,p3,v3], 1))
             F3 = self.conv33(f3)
             f2 = self.up(f3)+self.conv21(torch.cat([x2,p2], 1))
             F2 = self.conv23(f2)
@@ -766,7 +782,7 @@ class Generator(nn.Module):
         else:
             self.appearance_encoder = SpatialAppearanceEncoder(size=size)
         self.pose_encoder = PoseEncoder(size=size)
-        self.vol_encoder = VolumeEncoder(size=size, vol_feat_res=vol_feat_res)
+        self.predimg_encoder = PredimgEncoder(size=size)
 
         # StyleGAN
         self.channels = {
@@ -845,6 +861,7 @@ class Generator(nn.Module):
         flow,
         appearance,
         sil,
+        pred_image,
         vol_feature,
         styles=None,
         return_latents=False,
@@ -859,7 +876,7 @@ class Generator(nn.Module):
         if self.garment_transfer:
             styles, part_mask = self.appearance_encoder(appearance, flow, sil)
         else:
-            styles = self.appearance_encoder(appearance, flow, sil)
+            styles = self.appearance_encoder(appearance, flow, sil, vol_feature)
 
         if noise is None:
             if randomize_noise:
@@ -879,7 +896,7 @@ class Generator(nn.Module):
         for i in range(length):
             latent += [styles[i+1],styles[i+1]]
 
-        out = self.vol_encoder(vol_feature)
+        out = self.predimg_encoder(pred_image)
         out = self.conv1(out, latent[0], noise=noise[0])
         skip = self.to_rgb1(out, latent[1])
 
