@@ -188,6 +188,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
 
             #todo flow 배경부분에 왜 값이 있는지 확인 0.0039정도 있음
             flow = F.interpolate(flow, args.size)
+            # import pdb; pdb.set_trace()
 
             if args.faceloss:
                 FT = data['TargetFaceTransform'].float().to(device)
@@ -303,6 +304,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             batch_time.update(time.time() - batch_start_time)
 
             if i % 100 == 0:
+                print(f'Name: {args.name}')
                 print('Epoch: [{0}/{1}] Iter: [{2}/{3}]\t'
                         'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'.format(epoch, args.epoch, i, len(loader), batch_time=batch_time)
                         +
@@ -348,6 +350,21 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                         utils.save_image(
                             real_img[:args.n_sample],
                             os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_target.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=True,
+                            range=(-1, 1),
+                        )
+                        utils.save_image(
+                            pred_img[:args.n_sample],
+                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_course.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=True,
+                            range=(-1, 1),
+                        )
+                        warped_img = F.grid_sample(input_image, flow.permute(0,2,3,1))
+                        utils.save_image(
+                            warped_img[:args.n_sample],
+                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_warped.png"),
                             nrow=int(args.n_sample ** 0.5),
                             normalize=True,
                             range=(-1, 1),
@@ -431,6 +448,8 @@ if __name__ == "__main__":
         torch.cuda.set_device(args.local_rank)
         torch.distributed.init_process_group(backend="nccl", init_method="env://")
         synchronize()
+    else:
+        raise NotImplementedError()
 
     if get_rank() == 0:
         if not os.path.exists(os.path.join('checkpoint', args.name)):

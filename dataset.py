@@ -257,28 +257,28 @@ class DeepFashionDataset(Dataset):
 
 
         # either source or target pass 1:5
-        if self.phase == 'train':
-            choice = random.randint(0, 6)
-            if choice == 0:
-                # source pass
-                target_im = input_image
-                target_sil = silhouette1
-                target_image_name = source_view_id
-                target_left_pad = Sleft
-                target_right_pad = Sright
-            else:
-                # target pass
-                target_im = target_image
-                target_sil = silhouette2
-                target_image_name = target_view_id
-                target_left_pad = Tleft
-                target_right_pad = Tright
-        else:
-            target_im = target_image
-            target_sil = silhouette2
-            target_image_name = target_view_id
-            target_left_pad = Tleft
-            target_right_pad = Tright
+        # if self.phase == 'train':
+        #     choice = random.randint(0, 6)
+        #     if choice == 0:
+        #         # source pass
+        #         target_im = input_image
+        #         target_sil = silhouette1
+        #         target_image_name = source_view_id
+        #         target_left_pad = Sleft
+        #         target_right_pad = Sright
+        #     else:
+        #         # target pass
+        #         target_im = target_image
+        #         target_sil = silhouette2
+        #         target_image_name = target_view_id
+        #         target_left_pad = Tleft
+        #         target_right_pad = Tright
+        # else:
+        target_im = target_image
+        target_sil = silhouette2
+        target_image_name = target_view_id
+        target_left_pad = Tleft
+        target_right_pad = Tright
 
         # Get the face transfrom
         # if self.phase == 'train':
