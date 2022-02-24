@@ -551,7 +551,7 @@ class SpatialAppearanceEncoder(nn.Module):
         self.size = size
         self.dp_uv_lookup_256_np = np.load('util/dp_uv_lookup_256.npy')
         input_nc = 4 # source RGB and sil
-        input_vol_nc = 32
+        input_vol_nc = 128
 
         self.conv1 = ConvLayer(input_nc, ngf, 1)                #  ngf 256 256
         self.conv2 = ResBlock(ngf, ngf*2, blur_kernel)          # 2ngf 128 128
