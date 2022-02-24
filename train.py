@@ -126,7 +126,7 @@ def getFace(images, FT, LP, RP):
     return torch.cat(faces, 0)
 
 
-def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_ema, device):
+def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_ema, device, val_loader):
     pbar = range(args.epoch)
 
     if get_rank() == 0:
@@ -172,6 +172,23 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
         #####################################
         ############ START EPOCH ############
         #####################################
+
+        val_data = next(iter(val_loader))
+        val_input_image = val_data['input_image'].float().to(device)
+        val_real_img = val_data['target_image'].float().to(device)
+        val_flow = val_data['flow'].float().to(device)
+        val_sil = val_data['target_sil'].float().to(device)
+        val_feature = val_data['feature'].float().to(device)
+        val_pred_img = val_data['pred_image'].float().to(device)
+        val_attention = val_data['attention'].float().to(device)
+        val_flow = F.interpolate(val_flow, args.size)
+        val_real_img = val_real_img * val_sil
+        val_source_sil = val_data['input_sil'].float().to(device)
+        if args.finetune:
+            val_appearance = torch.cat([val_input_image, val_source_sil], 1)
+        else:
+            val_appearance = torch.cat([val_input_image * val_source_sil, val_source_sil], 1)
+
         for i, data in enumerate(loader):
             batch_start_time = time.time()
 
@@ -188,7 +205,6 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
 
             #todo flow 배경부분에 왜 값이 있는지 확인 0.0039정도 있음
             flow = F.interpolate(flow, args.size)
-            # import pdb; pdb.set_trace()
 
             if args.faceloss:
                 FT = data['TargetFaceTransform'].float().to(device)
@@ -328,6 +344,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
 
                 if i % 500 == 0:
                     with torch.no_grad():
+                        model_id_name = '_'.join([str(a) for a in data['model_id']])
                         g_ema.eval()
                         sample, _ = g_ema(appearance=appearance[:args.n_sample], flow=flow[:args.n_sample],
                                           sil=sil[:args.n_sample], pred_image=pred_img[:args.n_sample],
@@ -335,28 +352,28 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                         sample = sample * sil
                         utils.save_image(
                             sample,
-                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}.png"),
+                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_{model_id_name}.png"),
                             nrow=int(args.n_sample ** 0.5),
                             normalize=True,
                             range=(-1, 1),
                         )
                         utils.save_image(
                             input_image[:args.n_sample],
-                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_source.png"),
+                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_source_{model_id_name}.png"),
                             nrow=int(args.n_sample ** 0.5),
                             normalize=True,
                             range=(-1, 1),
                         )
                         utils.save_image(
                             real_img[:args.n_sample],
-                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_target.png"),
+                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_target_{model_id_name}.png"),
                             nrow=int(args.n_sample ** 0.5),
                             normalize=True,
                             range=(-1, 1),
                         )
                         utils.save_image(
                             pred_img[:args.n_sample],
-                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_course.png"),
+                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_course_{model_id_name}.png"),
                             nrow=int(args.n_sample ** 0.5),
                             normalize=True,
                             range=(-1, 1),
@@ -364,7 +381,54 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                         warped_img = F.grid_sample(input_image, flow.permute(0,2,3,1))
                         utils.save_image(
                             warped_img[:args.n_sample],
-                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_warped.png"),
+                            os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_warped_{model_id_name}.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=True,
+                            range=(-1, 1),
+                        )
+
+                        val_model_id_name = '_'.join([str(a) for a in val_data['model_id']])
+
+                        sample, _ = g_ema(appearance=val_appearance, flow=val_flow,
+                                          sil=val_sil, pred_image=val_pred_img,
+                                          vol_feature=val_feature, attention=val_attention)
+                        sample = sample * val_sil
+                        utils.save_image(
+                            sample,
+                            os.path.join('sample', args.name, 'val', f"epoch_{str(epoch)}_iter_{str(i)}.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=True,
+                            range=(-1, 1),
+                        )
+                        utils.save_image(
+                            val_input_image,
+                            os.path.join('sample', args.name, 'val',
+                                         f"epoch_{str(epoch)}_iter_{str(i)}_source.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=True,
+                            range=(-1, 1),
+                        )
+                        utils.save_image(
+                            val_real_img,
+                            os.path.join('sample', args.name, 'val',
+                                         f"epoch_{str(epoch)}_iter_{str(i)}_target.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=True,
+                            range=(-1, 1),
+                        )
+                        utils.save_image(
+                            val_pred_img,
+                            os.path.join('sample', args.name, 'val',
+                                         f"epoch_{str(epoch)}_iter_{str(i)}_course_.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=True,
+                            range=(-1, 1),
+                        )
+                        val_warped_img = F.grid_sample(val_input_image, val_flow.permute(0, 2, 3, 1))
+                        utils.save_image(
+                            val_warped_img,
+                            os.path.join('sample', args.name, 'val',
+                                         f"epoch_{str(epoch)}_iter_{str(i)}_warped.png"),
                             nrow=int(args.n_sample ** 0.5),
                             normalize=True,
                             range=(-1, 1),
@@ -448,14 +512,13 @@ if __name__ == "__main__":
         torch.cuda.set_device(args.local_rank)
         torch.distributed.init_process_group(backend="nccl", init_method="env://")
         synchronize()
-    else:
-        raise NotImplementedError()
 
     if get_rank() == 0:
         if not os.path.exists(os.path.join('checkpoint', args.name)):
             os.makedirs(os.path.join('checkpoint', args.name))
         if not os.path.exists(os.path.join('sample', args.name)):
             os.makedirs(os.path.join('sample', args.name))
+            os.makedirs(os.path.join('sample', args.name, 'val'))
 
     args.latent = 2048
     args.n_mlp = 8
@@ -529,6 +592,7 @@ if __name__ == "__main__":
         )
 
     dataset = DeepFashionDataset(args.path, 'train', args.size, args.vol_feat_res)
+    val_dataset = DeepFashionDataset(args.path, 'val', args.size, args.vol_feat_res)
     sampler = data_sampler(dataset, shuffle=True, distributed=args.distributed)
     loader = data.DataLoader(
         dataset,
@@ -539,8 +603,16 @@ if __name__ == "__main__":
         num_workers=args.workers,
         shuffle=False,
     )
+    val_loader = data.DataLoader(
+        val_dataset,
+        batch_size=8,
+        drop_last=True,
+        pin_memory=True,
+        num_workers=args.workers,
+        shuffle=False,
+    )
 
     if get_rank() == 0 and (wandb is not None) and args.wandb:
         wandb.init(project=args.name)
 
-    train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_ema, device)
+    train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_ema, device, val_loader)

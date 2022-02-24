@@ -73,6 +73,17 @@ class DeepFashionDataset(Dataset):
                         pair = [model_id, source_view_id, target_view_id]
                         self.pairs.append(pair)
 
+        elif self.phase == 'val':
+            self.pairs.append(['0501', 0, 0])
+            self.pairs.append(['0502', 0, 90])
+            self.pairs.append(['0503', 0, 180])
+            self.pairs.append(['0504', 0, 270])
+            self.pairs.append(['0505', 0, 0])
+            self.pairs.append(['0506', 90, 0])
+            self.pairs.append(['0507', 180, 0])
+            self.pairs.append(['0508', 270, 0])
+
+
         print('Loading data pairs finished ...')
 
 
@@ -299,10 +310,11 @@ class DeepFashionDataset(Dataset):
                     'target_left_pad':torch.tensor(target_left_pad),
                     'target_right_pad':torch.tensor(target_right_pad),
                     'input_sil': silhouette1,
-                    'save_name': save_name
+                    'save_name': save_name,
+                    'model_id': model_id
                     }
 
-        if self.phase == 'test':
+        else:
             save_name = str(model_id).zfill(4) + '_' + str(source_view_id).zfill(4) + '_2_' + str(source_view_id).zfill(4) + '_vis.png'
             return {'input_image':input_image, 'target_image':target_im, 'pred_image': pred_image, 'attention': attention,
                     'target_sil': target_sil,
@@ -312,4 +324,5 @@ class DeepFashionDataset(Dataset):
                     'feature': feature,
                     'input_sil': silhouette1,
                     'save_name':save_name,
+                    'model_id': model_id
                     }
