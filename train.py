@@ -518,6 +518,7 @@ if __name__ == "__main__":
             os.makedirs(os.path.join('checkpoint', args.name))
         if not os.path.exists(os.path.join('sample', args.name)):
             os.makedirs(os.path.join('sample', args.name))
+        if not os.path.exists(os.path.join('sample', args.name, 'val')):
             os.makedirs(os.path.join('sample', args.name, 'val'))
 
     args.latent = 2048

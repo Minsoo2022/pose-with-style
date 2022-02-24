@@ -792,7 +792,7 @@ class Generator(nn.Module):
             self.appearance_encoder = GarmentTransferSpatialAppearanceEncoder(size=size, part=part)
         else:
             self.appearance_encoder = SpatialAppearanceEncoder(size=size)
-        self.pose_encoder = PoseEncoder(size=size)
+        # self.pose_encoder = PoseEncoder(size=size)
         self.predimg_encoder = PredimgEncoder(size=size)
 
         # StyleGAN
