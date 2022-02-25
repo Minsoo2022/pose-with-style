@@ -55,7 +55,7 @@ class DeepFashionDataset(Dataset):
             for i in range(501):
                 model_id = str(i).zfill(4)
                 for source_view_id in list(range(0, 360, 18)):
-                    for target_veiw_diff in [0, 90, 180, 270]:
+                    for target_veiw_diff in [180]:
                         target_view_id = target_veiw_diff + source_view_id
                         if target_view_id >= 360:
                             target_view_id = target_view_id - 360
@@ -66,7 +66,7 @@ class DeepFashionDataset(Dataset):
             for i in range(501, 526):
                 model_id = str(i).zfill(4)
                 for source_view_id in list(range(0, 360, 18)):
-                    for target_veiw_diff in [0, 90, 180, 270]:
+                    for target_veiw_diff in [180]:
                         target_view_id = target_veiw_diff + source_view_id
                         if target_view_id >= 360:
                             target_view_id = target_view_id - 360
@@ -74,14 +74,14 @@ class DeepFashionDataset(Dataset):
                         self.pairs.append(pair)
 
         elif self.phase == 'val':
-            self.pairs.append(['0501', 0, 0])
-            self.pairs.append(['0502', 0, 90])
+            self.pairs.append(['0501', 0, 180])
+            self.pairs.append(['0502', 0, 180])
             self.pairs.append(['0503', 0, 180])
-            self.pairs.append(['0504', 0, 270])
-            self.pairs.append(['0505', 0, 0])
-            self.pairs.append(['0506', 90, 0])
+            self.pairs.append(['0504', 0, 180])
+            self.pairs.append(['0505', 180, 0])
+            self.pairs.append(['0506', 180, 0])
             self.pairs.append(['0507', 180, 0])
-            self.pairs.append(['0508', 270, 0])
+            self.pairs.append(['0508', 180, 0])
 
 
         print('Loading data pairs finished ...')

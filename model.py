@@ -564,16 +564,16 @@ class SpatialAppearanceEncoder(nn.Module):
             self.conv6 = ResBlock(ngf*8, ngf*8, blur_kernel)
             self.conv7 = ResBlock(ngf*8, ngf*8, blur_kernel)    # 8ngf 16  16 - starting from ngf 1024 0124
 
-        self.conv11 = EqualConv2d(ngf+1+1, ngf*8, 1)
-        self.conv21 = EqualConv2d(ngf*2+1+1, ngf*8, 1)
-        self.conv31 = EqualConv2d(ngf*4+ngf+1+1, ngf*8, 1)
-        self.conv41 = EqualConv2d(ngf*8+ngf*2+1+1, ngf*8, 1)
-        self.conv51 = EqualConv2d(ngf*8+ngf*4+1+1, ngf*8, 1)
+        self.conv11 = EqualConv2d(ngf+1, ngf*8, 1)
+        self.conv21 = EqualConv2d(ngf*2+1, ngf*8, 1)
+        self.conv31 = EqualConv2d(ngf*4+ngf+1, ngf*8, 1)
+        self.conv41 = EqualConv2d(ngf*8+ngf*2+1, ngf*8, 1)
+        self.conv51 = EqualConv2d(ngf*8+ngf*4+1, ngf*8, 1)
         if self.size == 512:
-            self.conv61 = EqualConv2d(ngf*8+ngf*8+1+1, ngf*8, 1)
+            self.conv61 = EqualConv2d(ngf*8+ngf*8+1, ngf*8, 1)
         if self.size == 1024:
-            self.conv61 = EqualConv2d(ngf*8+1+1, ngf*8, 1)
-            self.conv71 = EqualConv2d(ngf*8+1+1, ngf*8, 1)
+            self.conv61 = EqualConv2d(ngf*8+1, ngf*8, 1)
+            self.conv71 = EqualConv2d(ngf*8+1, ngf*8, 1)
 
         if self.size == 1024:
             self.conv13 = EqualConv2d(ngf*8, int(ngf/2), 3, padding=1)
@@ -645,7 +645,7 @@ class SpatialAppearanceEncoder(nn.Module):
         else:
             return warped_image
 
-    def forward(self, input, flow, sil, vol_feature, attention):
+    def forward(self, input, flow, sil, vol_feature):
 
         x1 = self.conv1(input)
         x2 = self.conv2(x1)
@@ -696,17 +696,6 @@ class SpatialAppearanceEncoder(nn.Module):
             p6 = torch.nn.functional.interpolate(sil, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
             p7 = torch.nn.functional.interpolate(sil, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
 
-        a1 = torch.nn.functional.interpolate(attention, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
-        a2 = torch.nn.functional.interpolate(attention, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
-        a3 = torch.nn.functional.interpolate(attention, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
-        a4 = torch.nn.functional.interpolate(attention, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
-        a5 = torch.nn.functional.interpolate(attention, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 512:
-            a6 = torch.nn.functional.interpolate(attention, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 1024:
-            a6 = torch.nn.functional.interpolate(attention, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-            a7 = torch.nn.functional.interpolate(attention, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
-
         x1 = x1 * p1
         x2 = x2 * p2
         x3 = x3 * p3
@@ -739,16 +728,16 @@ class SpatialAppearanceEncoder(nn.Module):
             f1 = self.up(f2)+self.conv11(torch.cat([x1,p1], 1))
             F1 = self.conv13(f1)
         elif self.size == 512:
-            F6 = self.conv61(torch.cat([x6,p6,v6,a6], 1))
-            f5 = self.up(F6)+self.conv51(torch.cat([x5,p5,v5,a5], 1))
+            F6 = self.conv61(torch.cat([x6,p6,v6], 1))
+            f5 = self.up(F6)+self.conv51(torch.cat([x5,p5,v5], 1))
             F5 = self.conv53(f5)
-            f4 = self.up(f5)+self.conv41(torch.cat([x4,p4,v4,a4], 1))
+            f4 = self.up(f5)+self.conv41(torch.cat([x4,p4,v4], 1))
             F4 = self.conv43(f4)
-            f3 = self.up(f4)+self.conv31(torch.cat([x3,p3,v3,a3], 1))
+            f3 = self.up(f4)+self.conv31(torch.cat([x3,p3,v3], 1))
             F3 = self.conv33(f3)
-            f2 = self.up(f3)+self.conv21(torch.cat([x2,p2,a2], 1))
+            f2 = self.up(f3)+self.conv21(torch.cat([x2,p2], 1))
             F2 = self.conv23(f2)
-            f1 = self.up(f2)+self.conv11(torch.cat([x1,p1,a1], 1))
+            f1 = self.up(f2)+self.conv11(torch.cat([x1,p1], 1))
             F1 = self.conv13(f1)
         else:
             F5 = self.conv51(torch.cat([x5,p5], 1))
@@ -874,7 +863,6 @@ class Generator(nn.Module):
         sil,
         pred_image,
         vol_feature,
-        attention,
         styles=None,
         return_latents=False,
         inject_index=None,
@@ -888,7 +876,7 @@ class Generator(nn.Module):
         if self.garment_transfer:
             styles, part_mask = self.appearance_encoder(appearance, flow, sil)
         else:
-            styles = self.appearance_encoder(appearance, flow, sil, vol_feature, attention)
+            styles = self.appearance_encoder(appearance, flow, sil, vol_feature)
 
         if noise is None:
             if randomize_noise:

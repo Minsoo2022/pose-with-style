@@ -235,7 +235,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             requires_grad(generator, False)
             requires_grad(discriminator, True)
 
-            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, pred_image=pred_img, vol_feature=feature, attention=attention)
+            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, pred_image=pred_img, vol_feature=feature)
             fake_img = fake_img * sil
 
             #todo 디스크리미네이터 어떤걸 concat할지
@@ -272,7 +272,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             requires_grad(generator, True)
             requires_grad(discriminator, False)
 
-            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, pred_image=pred_img, vol_feature=feature, attention=attention)
+            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, pred_image=pred_img, vol_feature=feature)
             fake_img = fake_img * sil
 
             fake_pred = discriminator(fake_img, condition=input_image * source_sil)
@@ -348,7 +348,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                         g_ema.eval()
                         sample, _ = g_ema(appearance=appearance[:args.n_sample], flow=flow[:args.n_sample],
                                           sil=sil[:args.n_sample], pred_image=pred_img[:args.n_sample],
-                                          vol_feature=feature[:args.n_sample], attention=attention[:args.n_sample])
+                                          vol_feature=feature[:args.n_sample])
                         sample = sample * sil
                         utils.save_image(
                             sample,
@@ -391,7 +391,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
 
                         sample, _ = g_ema(appearance=val_appearance, flow=val_flow,
                                           sil=val_sil, pred_image=val_pred_img,
-                                          vol_feature=val_feature, attention=val_attention)
+                                          vol_feature=val_feature)
                         sample = sample * val_sil
                         utils.save_image(
                             sample,
