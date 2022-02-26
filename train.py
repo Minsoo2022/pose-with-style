@@ -239,10 +239,10 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             fake_img = fake_img * sil
 
             #todo 디스크리미네이터 어떤걸 concat할지
-            fake_pred = discriminator(fake_img, condition=input_image * source_sil)
-            real_pred = discriminator(real_img, condition=input_image * source_sil)
-            # fake_pred = discriminator(fake_img, condition=pred_img)
-            # real_pred = discriminator(real_img, condition=pred_img)
+            # fake_pred = discriminator(fake_img, condition=input_image * source_sil)
+            # real_pred = discriminator(real_img, condition=input_image * source_sil)
+            fake_pred = discriminator(fake_img, condition=pred_img)
+            real_pred = discriminator(real_img, condition=pred_img)
             d_loss = d_logistic_loss(real_pred, fake_pred)
 
             loss_dict["d"] = d_loss
@@ -258,8 +258,8 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
 
             if d_regularize:
                 real_img.requires_grad = True
-                real_pred = discriminator(real_img, condition=input_image * source_sil)
-                # real_pred = discriminator(real_img, condition=pred_img)
+                # real_pred = discriminator(real_img, condition=input_image * source_sil)
+                real_pred = discriminator(real_img, condition=pred_img)
                 r1_loss = d_r1_loss(real_pred, real_img)
 
                 discriminator.zero_grad()
@@ -277,8 +277,8 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, input_feat=feature, condition=pred_img)
             fake_img = fake_img * sil
 
-            fake_pred = discriminator(fake_img, condition=input_image * source_sil)
-            # fake_pred = discriminator(fake_img, condition=pred_img)
+            # fake_pred = discriminator(fake_img, condition=input_image * source_sil)
+            fake_pred = discriminator(fake_img, condition=pred_img)
             g_loss = g_nonsaturating_loss(fake_pred)
 
             loss_dict["g"] = g_loss
