@@ -234,13 +234,15 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             ############ Optimize Discriminator ############
             requires_grad(generator, False)
             requires_grad(discriminator, True)
-            import pdb;pdb.set_trace()
+
             fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, input_feat=feature, condition=pred_img)
             fake_img = fake_img * sil
 
             #todo 디스크리미네이터 어떤걸 concat할지
             fake_pred = discriminator(fake_img, condition=input_image * source_sil)
             real_pred = discriminator(real_img, condition=input_image * source_sil)
+            # fake_pred = discriminator(fake_img, condition=pred_img)
+            # real_pred = discriminator(real_img, condition=pred_img)
             d_loss = d_logistic_loss(real_pred, fake_pred)
 
             loss_dict["d"] = d_loss
@@ -256,8 +258,8 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
 
             if d_regularize:
                 real_img.requires_grad = True
-
                 real_pred = discriminator(real_img, condition=input_image * source_sil)
+                # real_pred = discriminator(real_img, condition=pred_img)
                 r1_loss = d_r1_loss(real_pred, real_img)
 
                 discriminator.zero_grad()
@@ -276,6 +278,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             fake_img = fake_img * sil
 
             fake_pred = discriminator(fake_img, condition=input_image * source_sil)
+            # fake_pred = discriminator(fake_img, condition=pred_img)
             g_loss = g_nonsaturating_loss(fake_pred)
 
             loss_dict["g"] = g_loss
@@ -387,7 +390,9 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                             range=(-1, 1),
                         )
 
+
                         val_model_id_name = '_'.join([str(a) for a in val_data['model_id']])
+                        torch.cuda.empty_cache()
 
                         sample, _ = g_ema(appearance=val_appearance, flow=val_flow,
                                           sil=val_sil, input_feat=val_feature,
@@ -434,18 +439,18 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                             range=(-1, 1),
                         )
 
-                if i % 5000 == 0:
-                    torch.save(
-                        {
-                            "g": g_module.state_dict(),
-                            "d": d_module.state_dict(),
-                            "g_ema": g_ema.state_dict(),
-                            "g_optim": g_optim.state_dict(),
-                            "d_optim": d_optim.state_dict(),
-                            "args": args,
-                        },
-                        os.path.join('checkpoint', args.name, f"epoch_{str(epoch)}_iter_{str(i)}.pt"),
-                    )
+                # if i % 5000 == 0:
+                #     torch.save(
+                #         {
+                #             "g": g_module.state_dict(),
+                #             "d": d_module.state_dict(),
+                #             "g_ema": g_ema.state_dict(),
+                #             "g_optim": g_optim.state_dict(),
+                #             "d_optim": d_optim.state_dict(),
+                #             "args": args,
+                #         },
+                #         os.path.join('checkpoint', args.name, f"epoch_{str(epoch)}_iter_{str(i)}.pt"),
+                #     )
 
         ###################################
         ############ END EPOCH ############
