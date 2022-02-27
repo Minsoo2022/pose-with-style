@@ -69,8 +69,8 @@ class DeepFashionDataset(Dataset):
         elif self.phase == 'test':
             for i in range(501, 526):
                 model_id = str(i).zfill(4)
-                for source_view_id in list(range(0, 360, 18)):
-                    for target_view_diff in self.target_view_diff_list:
+                for source_view_id in [0, 180]:
+                    for target_view_diff in [180]:
                         target_view_id = target_view_diff + source_view_id
                         if target_view_id >= 360:
                             target_view_id = target_view_id - 360
@@ -328,5 +328,7 @@ class DeepFashionDataset(Dataset):
                     'feature': feature,
                     'input_sil': silhouette1,
                     'save_name':save_name,
-                    'model_id': model_id
+                    'model_id': model_id,
+                    'source_view_id': str(source_view_id).zfill(4),
+                    'target_view_id': str(target_view_id).zfill(4)
                     }
