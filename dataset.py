@@ -10,12 +10,16 @@ import pickle
 import cv2 as cv
 
 class DeepFashionDataset(Dataset):
-    def __init__(self, path, phase, size, vol_feat_res=32):
+    def __init__(self, path, phase, size, all_view=False, vol_feat_res=128):
         # path = /home/nas1_temp/dataset/Thuman
         self.path = path
         self.phase = phase  # train or test
         self.size = size    # 256 or 512  FOR  174x256 or 348x512
         self.vol_feat_res = vol_feat_res
+        if all_view:
+            self.target_view_diff_list = [90, 180, 270]
+        else:
+            self.target_view_diff_list = [180]
 
         # set root directories
         self.image_root = os.path.join(path, 'DeepFashion_highres', phase)
@@ -55,8 +59,8 @@ class DeepFashionDataset(Dataset):
             for i in range(501):
                 model_id = str(i).zfill(4)
                 for source_view_id in list(range(0, 360, 18)):
-                    for target_veiw_diff in [180]:
-                        target_view_id = target_veiw_diff + source_view_id
+                    for target_view_diff in self.target_view_diff_list:
+                        target_view_id = target_view_diff + source_view_id
                         if target_view_id >= 360:
                             target_view_id = target_view_id - 360
                         pair = [model_id, source_view_id, target_view_id]
@@ -66,8 +70,8 @@ class DeepFashionDataset(Dataset):
             for i in range(501, 526):
                 model_id = str(i).zfill(4)
                 for source_view_id in list(range(0, 360, 18)):
-                    for target_veiw_diff in [180]:
-                        target_view_id = target_veiw_diff + source_view_id
+                    for target_view_diff in self.target_view_diff_list:
+                        target_view_id = target_view_diff + source_view_id
                         if target_view_id >= 360:
                             target_view_id = target_view_id - 360
                         pair = [model_id, source_view_id, target_view_id]

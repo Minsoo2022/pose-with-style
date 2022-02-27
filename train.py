@@ -184,10 +184,17 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
         val_flow = F.interpolate(val_flow, args.size)
         val_real_img = val_real_img * val_sil
         val_source_sil = val_data['input_sil'].float().to(device)
+        val_warped_img = F.grid_sample(val_input_image, val_flow.permute(0, 2, 3, 1)) * val_sil
+        val_pred_img = F.interpolate(val_pred_img, size=(args.size, args.size), mode='nearest')
+        val_attention = F.interpolate(val_attention, size=(args.size, args.size), mode='bilinear', align_corners=True)
         if args.finetune:
-            val_appearance = torch.cat([val_input_image, val_source_sil], 1)
+            val_appearance = torch.cat([val_pred_img, val_warped_img, val_sil], 1)
         else:
-            val_appearance = torch.cat([val_input_image * val_source_sil, val_source_sil], 1)
+            if args.allview:
+                val_appearance = torch.cat([val_pred_img * val_sil, val_warped_img * val_sil, val_sil, val_attention], 1)
+            else:
+                val_appearance = torch.cat([val_pred_img * val_sil, val_warped_img * val_sil, val_sil], 1)
+
 
         for i, data in enumerate(loader):
             batch_start_time = time.time()
@@ -199,6 +206,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             feature = data['feature'].float().to(device)
             pred_img = data['pred_image'].float().to(device)
             attention = data['attention'].float().to(device)
+            attention = F.interpolate(attention, size=(args.size, args.size), mode='bilinear', align_corners=True)
 
             LeftPad = data['target_left_pad'].float().to(device)
             RightPad = data['target_right_pad'].float().to(device)
@@ -225,17 +233,22 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             # complete_coor = data['complete_coor'].float().to(device)
             # if args.size == 256:
             #     complete_coor = torch.nn.functional.interpolate(complete_coor, size=(256, 256), mode='bilinear')
+            warped_img = F.grid_sample(input_image, flow.permute(0,2,3,1)) * sil
+            pred_img = F.interpolate(pred_img, size=(args.size, args.size), mode='nearest')
             if args.finetune:
-                appearance = torch.cat([input_image, source_sil], 1)
+                appearance = torch.cat([pred_img, warped_img, sil], 1)
             else:
-                appearance = torch.cat([input_image * source_sil, source_sil], 1)
+                if args.allview:
+                    appearance = torch.cat([pred_img * sil, warped_img * sil, sil, attention], 1)
+                else:
+                    appearance = torch.cat([pred_img * sil, warped_img * sil, sil], 1)
 
 
             ############ Optimize Discriminator ############
             requires_grad(generator, False)
             requires_grad(discriminator, True)
 
-            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, input_feat=feature, condition=pred_img)
+            fake_img, _ = generator(appearance=appearance, sil=sil, input_feat=feature)
             fake_img = fake_img * sil
 
             #todo 디스크리미네이터 어떤걸 concat할지
@@ -274,7 +287,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             requires_grad(generator, True)
             requires_grad(discriminator, False)
 
-            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, input_feat=feature, condition=pred_img)
+            fake_img, _ = generator(appearance=appearance, sil=sil, input_feat=feature)
             fake_img = fake_img * sil
 
             # fake_pred = discriminator(fake_img, condition=input_image * source_sil)
@@ -349,9 +362,9 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                     with torch.no_grad():
                         model_id_name = '_'.join([str(a) for a in data['model_id']])
                         g_ema.eval()
-                        sample, _ = g_ema(appearance=appearance[:args.n_sample], flow=flow[:args.n_sample],
-                                          sil=sil[:args.n_sample], input_feat=feature[:args.n_sample],
-                                          condition=pred_img[:args.n_sample])
+                        sample, _ = g_ema(appearance=appearance[:args.n_sample], sil=sil[:args.n_sample],
+                                          input_feat=feature[:args.n_sample],
+                                          )
                         sample = sample * sil
                         utils.save_image(
                             sample,
@@ -381,7 +394,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                             normalize=True,
                             range=(-1, 1),
                         )
-                        warped_img = F.grid_sample(input_image, flow.permute(0,2,3,1))
+
                         utils.save_image(
                             warped_img[:args.n_sample],
                             os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_warped_{model_id_name}.png"),
@@ -394,9 +407,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                         val_model_id_name = '_'.join([str(a) for a in val_data['model_id']])
                         torch.cuda.empty_cache()
 
-                        sample, _ = g_ema(appearance=val_appearance, flow=val_flow,
-                                          sil=val_sil, input_feat=val_feature,
-                                          condition=val_pred_img)
+                        sample, _ = g_ema(appearance=val_appearance, sil=val_sil, input_feat=val_feature)
                         sample = sample * val_sil
                         utils.save_image(
                             sample,
@@ -405,39 +416,40 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                             normalize=True,
                             range=(-1, 1),
                         )
-                        utils.save_image(
-                            val_input_image,
-                            os.path.join('sample', args.name, 'val',
-                                         f"epoch_{str(epoch)}_iter_{str(i)}_source.png"),
-                            nrow=int(args.n_sample ** 0.5),
-                            normalize=True,
-                            range=(-1, 1),
-                        )
-                        utils.save_image(
-                            val_real_img,
-                            os.path.join('sample', args.name, 'val',
-                                         f"epoch_{str(epoch)}_iter_{str(i)}_target.png"),
-                            nrow=int(args.n_sample ** 0.5),
-                            normalize=True,
-                            range=(-1, 1),
-                        )
-                        utils.save_image(
-                            val_pred_img,
-                            os.path.join('sample', args.name, 'val',
-                                         f"epoch_{str(epoch)}_iter_{str(i)}_course_.png"),
-                            nrow=int(args.n_sample ** 0.5),
-                            normalize=True,
-                            range=(-1, 1),
-                        )
-                        val_warped_img = F.grid_sample(val_input_image, val_flow.permute(0, 2, 3, 1))
-                        utils.save_image(
-                            val_warped_img,
-                            os.path.join('sample', args.name, 'val',
-                                         f"epoch_{str(epoch)}_iter_{str(i)}_warped.png"),
-                            nrow=int(args.n_sample ** 0.5),
-                            normalize=True,
-                            range=(-1, 1),
-                        )
+                        if i == 0:
+                            utils.save_image(
+                                val_input_image,
+                                os.path.join('sample', args.name, 'val',
+                                             f"epoch_{str(epoch)}_iter_{str(i)}_source.png"),
+                                nrow=int(args.n_sample ** 0.5),
+                                normalize=True,
+                                range=(-1, 1),
+                            )
+                            utils.save_image(
+                                val_real_img,
+                                os.path.join('sample', args.name, 'val',
+                                             f"epoch_{str(epoch)}_iter_{str(i)}_target.png"),
+                                nrow=int(args.n_sample ** 0.5),
+                                normalize=True,
+                                range=(-1, 1),
+                            )
+                            utils.save_image(
+                                val_pred_img,
+                                os.path.join('sample', args.name, 'val',
+                                             f"epoch_{str(epoch)}_iter_{str(i)}_course_.png"),
+                                nrow=int(args.n_sample ** 0.5),
+                                normalize=True,
+                                range=(-1, 1),
+                            )
+                            val_warped_img = F.grid_sample(val_input_image, val_flow.permute(0, 2, 3, 1))
+                            utils.save_image(
+                                val_warped_img,
+                                os.path.join('sample', args.name, 'val',
+                                             f"epoch_{str(epoch)}_iter_{str(i)}_warped.png"),
+                                nrow=int(args.n_sample ** 0.5),
+                                normalize=True,
+                                range=(-1, 1),
+                            )
 
                 # if i % 5000 == 0:
                 #     torch.save(
@@ -502,6 +514,7 @@ if __name__ == "__main__":
     parser.add_argument("--local_rank", type=int, default=0, help="local rank for distributed training")
     parser.add_argument("--faceloss", action="store_true", help="add face loss when faces are detected")
     parser.add_argument("--finetune", action="store_true", help="finetune to handle background- second step of training.")
+    parser.add_argument("--allview", action="store_true")
     # parser.add_argument("--gpu_ids", type=str, default=0, help="add face loss when faces are detected")
 
     args = parser.parse_args()
@@ -537,9 +550,9 @@ if __name__ == "__main__":
         sys.exit()
 
     # define models
-    generator = Generator(args.size, args.latent, args.n_mlp, args.vol_feat_res, channel_multiplier=args.channel_multiplier).to(device)
+    generator = Generator(args.size, args.latent, args.n_mlp, args.vol_feat_res, channel_multiplier=args.channel_multiplier, att_cat=args.allview).to(device)
     discriminator = Discriminator(args.size, channel_multiplier=args.channel_multiplier).to(device)
-    g_ema = Generator(args.size, args.latent, args.n_mlp, args.vol_feat_res, channel_multiplier=args.channel_multiplier).to(device)
+    g_ema = Generator(args.size, args.latent, args.n_mlp, args.vol_feat_res, channel_multiplier=args.channel_multiplier, att_cat=args.allview).to(device)
     g_ema.eval()
     accumulate(g_ema, generator, 0)
 
@@ -597,8 +610,8 @@ if __name__ == "__main__":
             broadcast_buffers=False,
         )
 
-    dataset = DeepFashionDataset(args.path, 'train', args.size, args.vol_feat_res)
-    val_dataset = DeepFashionDataset(args.path, 'val', args.size, args.vol_feat_res)
+    dataset = DeepFashionDataset(args.path, 'train', args.size, args.allview, args.vol_feat_res)
+    val_dataset = DeepFashionDataset(args.path, 'val', args.size, args.allview, args.vol_feat_res)
     sampler = data_sampler(dataset, shuffle=True, distributed=args.distributed)
     loader = data.DataLoader(
         dataset,
