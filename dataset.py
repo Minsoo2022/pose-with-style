@@ -56,8 +56,12 @@ class DeepFashionDataset(Dataset):
 
 
         if self.phase == 'train':
-            for i in range(501):
-                model_id = str(i).zfill(4)
+            model_id_list = []
+            with open(os.path.join(self.path,'data_list_train_new.txt')) as f:
+                id = f.readlines()
+            model_id_list = list(map(lambda x: x[:-1] if x.endswith('\n') else x, id))
+
+            for model_id in model_id_list:
                 for source_view_id in list(range(0, 360, 18)):
                     for target_veiw_diff in [180]:
                         target_view_id = target_veiw_diff + source_view_id
@@ -67,25 +71,39 @@ class DeepFashionDataset(Dataset):
                         self.pairs.append(pair)
 
         elif self.phase == 'test':
-            for i in range(501, 526):
+            # for i in range(501, 526):
+            #     model_id = str(i).zfill(4)
+            #     for source_view_id in [0, 180]:
+            #         for target_view_diff in [180]:
+            #             target_view_id = target_view_diff + source_view_id
+            #             if target_view_id >= 360:
+            #                 target_view_id = target_view_id - 360
+            #             pair = [model_id, source_view_id, target_view_id]
+            #             self.pairs.append(pair)
+            source_view_list = [138, 155, 195, 73, 303, 225, 240, 333, 136, 197, 222, 272, 291, 298, 147, 38, 194,
+                                275, 348, 40, 1, 13, 325, 273, 186]
+            for num, i in enumerate(range(501,526)):
                 model_id = str(i).zfill(4)
-                for source_view_id in [0, 180]:
-                    for target_view_diff in [180]:
-                        target_view_id = target_view_diff + source_view_id
-                        if target_view_id >= 360:
-                            target_view_id = target_view_id - 360
-                        pair = [model_id, source_view_id, target_view_id]
-                        self.pairs.append(pair)
+                source_view_id = source_view_list[num]
+                target_view_id = source_view_id + 180
+                if target_view_id >= 360:
+                    target_view_id = target_view_id - 360
+                pair = [model_id, source_view_id, target_view_id]
+                self.pairs.append(pair)
+
 
         elif self.phase == 'val':
-            self.pairs.append(['0501', 0, 180])
-            self.pairs.append(['0502', 0, 180])
-            self.pairs.append(['0503', 0, 180])
-            self.pairs.append(['0504', 0, 180])
-            self.pairs.append(['0505', 180, 0])
-            self.pairs.append(['0506', 180, 0])
-            self.pairs.append(['0507', 180, 0])
-            self.pairs.append(['0508', 180, 0])
+            with open(os.path.join(self.path,'data_list_test_new.txt')) as f:
+                id = f.readlines()
+            model_id_list = list(map(lambda x: x[:-1] if x.endswith('\n') else x, id))
+            self.pairs.append([model_id_list[0], 0, 180])
+            self.pairs.append([model_id_list[1], 0, 180])
+            self.pairs.append([model_id_list[2], 0, 180])
+            self.pairs.append([model_id_list[3], 0, 180])
+            self.pairs.append([model_id_list[4], 180, 0])
+            self.pairs.append([model_id_list[5], 180, 0])
+            self.pairs.append([model_id_list[6], 180, 0])
+            self.pairs.append([model_id_list[7], 180, 0])
 
 
         print('Loading data pairs finished ...')

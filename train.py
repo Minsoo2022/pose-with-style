@@ -405,39 +405,40 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                             normalize=True,
                             range=(-1, 1),
                         )
-                        utils.save_image(
-                            val_input_image,
-                            os.path.join('sample', args.name, 'val',
-                                         f"epoch_{str(epoch)}_iter_{str(i)}_source.png"),
-                            nrow=int(args.n_sample ** 0.5),
-                            normalize=True,
-                            range=(-1, 1),
-                        )
-                        utils.save_image(
-                            val_real_img,
-                            os.path.join('sample', args.name, 'val',
-                                         f"epoch_{str(epoch)}_iter_{str(i)}_target.png"),
-                            nrow=int(args.n_sample ** 0.5),
-                            normalize=True,
-                            range=(-1, 1),
-                        )
-                        utils.save_image(
-                            val_pred_img,
-                            os.path.join('sample', args.name, 'val',
-                                         f"epoch_{str(epoch)}_iter_{str(i)}_course_.png"),
-                            nrow=int(args.n_sample ** 0.5),
-                            normalize=True,
-                            range=(-1, 1),
-                        )
-                        val_warped_img = F.grid_sample(val_input_image, val_flow.permute(0, 2, 3, 1))
-                        utils.save_image(
-                            val_warped_img,
-                            os.path.join('sample', args.name, 'val',
-                                         f"epoch_{str(epoch)}_iter_{str(i)}_warped.png"),
-                            nrow=int(args.n_sample ** 0.5),
-                            normalize=True,
-                            range=(-1, 1),
-                        )
+                        if i == 0:
+                            utils.save_image(
+                                val_input_image,
+                                os.path.join('sample', args.name, 'val',
+                                             f"epoch_{str(epoch)}_iter_{str(i)}_source.png"),
+                                nrow=int(args.n_sample ** 0.5),
+                                normalize=True,
+                                range=(-1, 1),
+                            )
+                            utils.save_image(
+                                val_real_img,
+                                os.path.join('sample', args.name, 'val',
+                                             f"epoch_{str(epoch)}_iter_{str(i)}_target.png"),
+                                nrow=int(args.n_sample ** 0.5),
+                                normalize=True,
+                                range=(-1, 1),
+                            )
+                            utils.save_image(
+                                val_pred_img,
+                                os.path.join('sample', args.name, 'val',
+                                             f"epoch_{str(epoch)}_iter_{str(i)}_course_.png"),
+                                nrow=int(args.n_sample ** 0.5),
+                                normalize=True,
+                                range=(-1, 1),
+                            )
+                            val_warped_img = F.grid_sample(val_input_image, val_flow.permute(0, 2, 3, 1))
+                            utils.save_image(
+                                val_warped_img,
+                                os.path.join('sample', args.name, 'val',
+                                             f"epoch_{str(epoch)}_iter_{str(i)}_warped.png"),
+                                nrow=int(args.n_sample ** 0.5),
+                                normalize=True,
+                                range=(-1, 1),
+                            )
 
                 # if i % 5000 == 0:
                 #     torch.save(

@@ -278,9 +278,10 @@ if __name__ == "__main__":
     dataset = DeepFashionDataset(args.path, 'test', args.size, args.allview, args.vol_feat_res)
 
     loader = data.DataLoader(
+
         dataset,
         batch_size=args.batch,
-        drop_last=True,
+        drop_last=False,
         pin_memory=True,
         num_workers=args.workers,
         shuffle=False,
