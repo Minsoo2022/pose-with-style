@@ -153,16 +153,16 @@ class DeepFashionDataset(Dataset):
 
     def load_stage1_output(self, data_item, source_view_id, target_view_id, vol_feat_res):
         flow_fpath = os.path.join(
-            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie', str(data_item).zfill(4),
+            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val', str(data_item).zfill(4),
             'flow/%04d_%04d.png' % (source_view_id, target_view_id))
         pred_image_fpath = os.path.join(
-            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie', str(data_item).zfill(4),
+            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val', str(data_item).zfill(4),
             'pred_image/%04d_%04d.png' % (source_view_id, target_view_id))
         attention_fpath = os.path.join(
-            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie', str(data_item).zfill(4),
+            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val', str(data_item).zfill(4),
             'attention/%04d_%04d.png' % (source_view_id, target_view_id))
         feature_fpath = os.path.join(
-            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie', str(data_item).zfill(4),
+            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val', str(data_item).zfill(4),
             'feature/%s/%04d_%04d.npy' % (str(vol_feat_res), source_view_id, target_view_id))
         try:
             flow = Image.open(flow_fpath)
