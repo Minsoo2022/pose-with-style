@@ -184,6 +184,8 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
         val_flow = F.interpolate(val_flow, args.size)
         val_real_img = val_real_img * val_sil
         val_source_sil = val_data['input_sil'].float().to(device)
+        val_pred_img = torch.nn.functional.interpolate(val_pred_img, size=(args.size, args.size), mode='bilinear',
+                                                   align_corners=True)
         if args.finetune:
             val_appearance = torch.cat([val_input_image, val_source_sil], 1)
         else:
@@ -205,6 +207,8 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
 
             #todo flow 배경부분에 왜 값이 있는지 확인 0.0039정도 있음
             flow = F.interpolate(flow, args.size)
+            pred_img = torch.nn.functional.interpolate(pred_img, size=(args.size, args.size), mode='bilinear',
+                                                        align_corners=True)
 
             if args.faceloss:
                 FT = data['TargetFaceTransform'].float().to(device)
