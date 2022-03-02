@@ -153,26 +153,22 @@ class DeepFashionDataset(Dataset):
 
     def load_stage1_output(self, data_item, source_view_id, target_view_id, vol_feat_res):
         flow_fpath = os.path.join(
-            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val_GCMR', str(data_item).zfill(4),
+            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie', str(data_item).zfill(4),
             'flow/%04d_%04d.png' % (source_view_id, target_view_id))
         pred_image_fpath = os.path.join(
-            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val_GCMR', str(data_item).zfill(4),
+            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie', str(data_item).zfill(4),
             'pred_image/%04d_%04d.png' % (source_view_id, target_view_id))
         attention_fpath = os.path.join(
-            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val_GCMR', str(data_item).zfill(4),
+            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie', str(data_item).zfill(4),
             'attention/%04d_%04d.png' % (source_view_id, target_view_id))
-        feature_fpath = os.path.join(
-            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val_GCMR', str(data_item).zfill(4),
-            'feature/%s/%04d_%04d.npy' % (str(vol_feat_res), source_view_id, target_view_id))
+
         try:
             flow = Image.open(flow_fpath)
             pred_image = Image.open(pred_image_fpath)
             attention = Image.open(attention_fpath)
-            feature = np.load(feature_fpath)
         except:
-            print(feature_fpath)
             raise RuntimeError('Failed to load stage1 output: ' + flow_fpath)
-        return flow, pred_image, attention, feature
+        return flow, pred_image, attention
 
 
     def __getitem__(self, index):
@@ -219,7 +215,7 @@ class DeepFashionDataset(Dataset):
             # silhouette1 = 1-((1-silhouette1) * (input_densepose[:, :, 0] == 0).astype('float'))
             input_image, silhouette1 = self.load_image(model_id, source_view_id)
             target_image, silhouette2 = self.load_image(model_id, target_view_id)
-            flow, pred_image, attention, feature = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
+            flow, pred_image, attention = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
 
         else:
             # input_image = self.resize_height_PIL(input_image_pil, self.size)
@@ -235,7 +231,7 @@ class DeepFashionDataset(Dataset):
             # silhouette2 = 1-((1-silhouette2) * (target_densepose[:, :, 0] == 0).astype('float'))
             input_image, silhouette1 = self.load_image(model_id, source_view_id)
             target_image, silhouette2 = self.load_image(model_id, target_view_id)
-            flow, pred_image, attention, feature = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
+            flow, pred_image, attention = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
 
         # read uv-space data
         # complete_coor = np.load(complete_coor_path)
@@ -327,7 +323,6 @@ class DeepFashionDataset(Dataset):
             return {'input_image':input_image, 'target_image':target_im, 'pred_image': pred_image, 'attention': attention,
                     'target_sil': target_sil,
                     'flow': flow,
-                    'feature': feature,
                     'TargetFaceTransform': FT,
                     'target_left_pad':torch.tensor(target_left_pad),
                     'target_right_pad':torch.tensor(target_right_pad),
@@ -343,7 +338,6 @@ class DeepFashionDataset(Dataset):
                     'target_left_pad':torch.tensor(target_left_pad),
                     'target_right_pad':torch.tensor(target_right_pad),
                     'flow': flow,
-                    'feature': feature,
                     'input_sil': silhouette1,
                     'save_name':save_name,
                     'model_id': model_id,

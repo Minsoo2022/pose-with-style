@@ -178,12 +178,13 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
         val_real_img = val_data['target_image'].float().to(device)
         val_flow = val_data['flow'].float().to(device)
         val_sil = val_data['target_sil'].float().to(device)
-        val_feature = val_data['feature'].float().to(device)
-        val_pred_img = val_data['pred_image'].float().to(device)
+        val_pred_img_ori = val_data['pred_image'].float().to(device)
         val_attention = val_data['attention'].float().to(device)
         val_flow = F.interpolate(val_flow, args.size)
         val_real_img = val_real_img * val_sil
         val_source_sil = val_data['input_sil'].float().to(device)
+        val_pred_img = F.interpolate(val_pred_img_ori, size=(args.size, args.size), mode='nearest')
+
         if args.finetune:
             val_appearance = torch.cat([val_input_image, val_source_sil], 1)
         else:
@@ -196,8 +197,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             real_img = data['target_image'].float().to(device)
             flow = data['flow'].float().to(device)
             sil = data['target_sil'].float().to(device)
-            feature = data['feature'].float().to(device)
-            pred_img = data['pred_image'].float().to(device)
+            pred_img_ori = data['pred_image'].float().to(device)
             attention = data['attention'].float().to(device)
 
             LeftPad = data['target_left_pad'].float().to(device)
@@ -205,6 +205,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
 
             #todo flow 배경부분에 왜 값이 있는지 확인 0.0039정도 있음
             flow = F.interpolate(flow, args.size)
+            pred_img = F.interpolate(pred_img_ori, size=(args.size, args.size), mode='nearest')
 
             if args.faceloss:
                 FT = data['TargetFaceTransform'].float().to(device)
@@ -235,7 +236,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             requires_grad(generator, False)
             requires_grad(discriminator, True)
 
-            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, input_feat=feature, condition=pred_img)
+            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, input_feat=pred_img_ori, condition=pred_img)
             fake_img = fake_img * sil
 
             #todo 디스크리미네이터 어떤걸 concat할지
@@ -274,7 +275,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             requires_grad(generator, True)
             requires_grad(discriminator, False)
 
-            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, input_feat=feature, condition=pred_img)
+            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, input_feat=pred_img_ori, condition=pred_img)
             fake_img = fake_img * sil
 
             # fake_pred = discriminator(fake_img, condition=input_image * source_sil)
@@ -350,7 +351,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                         model_id_name = '_'.join([str(a) for a in data['model_id']])
                         g_ema.eval()
                         sample, _ = g_ema(appearance=appearance[:args.n_sample], flow=flow[:args.n_sample],
-                                          sil=sil[:args.n_sample], input_feat=feature[:args.n_sample],
+                                          sil=sil[:args.n_sample], input_feat=pred_img_ori[:args.n_sample],
                                           condition=pred_img[:args.n_sample])
                         sample = sample * sil
                         utils.save_image(
@@ -395,7 +396,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                         torch.cuda.empty_cache()
 
                         sample, _ = g_ema(appearance=val_appearance, flow=val_flow,
-                                          sil=val_sil, input_feat=val_feature,
+                                          sil=val_sil, input_feat=val_pred_img_ori,
                                           condition=val_pred_img)
                         sample = sample * val_sil
                         utils.save_image(

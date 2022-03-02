@@ -145,7 +145,7 @@ def generate(args, loader, g_ema, device):
         flow = data['flow'].float().to(device)
         sil = data['target_sil'].float().to(device)
         feature = data['feature'].float().to(device)
-        pred_img = data['pred_image'].float().to(device)
+        pred_img_ori = data['pred_image'].float().to(device)
         attention = data['attention'].float().to(device)
         attention = F.interpolate(attention, size=(args.size, args.size), mode='bilinear', align_corners=True)
 
@@ -166,7 +166,7 @@ def generate(args, loader, g_ema, device):
         # if args.size == 256:
         #     complete_coor = torch.nn.functional.interpolate(complete_coor, size=(256, 256), mode='bilinear')
         warped_img = F.grid_sample(input_image, flow.permute(0,2,3,1)) * sil
-        pred_img = F.interpolate(pred_img, size=(args.size, args.size), mode='nearest')
+        pred_img = F.interpolate(pred_img_ori, size=(args.size, args.size), mode='nearest')
         if args.finetune:
             appearance = torch.cat([input_image, source_sil], 1)
         else:

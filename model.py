@@ -511,22 +511,18 @@ class PoseEncoder(nn.Module):
         return out
 
 class InputEncoder(nn.Module):
-    def __init__(self, ngf=64, blur_kernel=[1, 3, 3, 1], size=256, img_res=256):
+    def __init__(self, ngf=64, blur_kernel=[1, 3, 3, 1], size=256):
         super().__init__()
         self.size = size
-        input_ch = 128
+        input_ch = 3
         convs = [ConvLayer(input_ch, ngf, 1)]
-        if img_res == 128:
-            convs.append(ResBlock(ngf, ngf * 2, blur_kernel, downsample=True))
-            convs.append(ResBlock(ngf * 2, ngf * 4, blur_kernel, downsample=True))
-            convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=False))
-            convs.append(ResBlock(ngf * 8, ngf * 8, blur_kernel, downsample=False))
-        elif img_res == 256:
+
+        if size == 128:
             convs.append(ResBlock(ngf, ngf * 2, blur_kernel, downsample=True))
             convs.append(ResBlock(ngf * 2, ngf * 4, blur_kernel, downsample=True))
             convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=True))
             convs.append(ResBlock(ngf * 8, ngf * 8, blur_kernel, downsample=False))
-        elif img_res == 512:
+        elif size == 256:
             convs.append(ResBlock(ngf, ngf * 2, blur_kernel, downsample=True))
             convs.append(ResBlock(ngf * 2, ngf * 4, blur_kernel, downsample=True))
             convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=True))
@@ -782,12 +778,11 @@ class Generator(nn.Module):
         self.size = size
         self.style_dim = style_dim
 
-        if self.garment_transfer:
-            self.appearance_encoder = GarmentTransferSpatialAppearanceEncoder(size=size, part=part)
-        else:
-            self.appearance_encoder = SpatialAppearanceEncoder(size=size)
+
+
+        self.appearance_encoder = SpatialAppearanceEncoder(size=size)
         # self.pose_encoder = PoseEncoder(size=size)
-        self.input_encoder = InputEncoder(size=128)
+        self.input_encoder = InputEncoder(size=256)
 
         # StyleGAN
         self.channels = {
@@ -878,10 +873,8 @@ class Generator(nn.Module):
         randomize_noise=True,
     ):
 
-        if self.garment_transfer:
-            styles, part_mask = self.appearance_encoder(appearance, flow, sil)
-        else:
-            styles = self.appearance_encoder(appearance, flow, sil, condition)
+
+        styles = self.appearance_encoder(appearance, flow, sil, condition)
 
         if noise is None:
             if randomize_noise:
@@ -1200,346 +1193,3 @@ class Vgg19(torch.nn.Module):
         h_relu5 = self.slice5(h_relu4)
         out = [h_relu1, h_relu2, h_relu3, h_relu4, h_relu5]
         return out
-
-
-## Garment transfer
-class GarmentTransferSpatialAppearanceEncoder(nn.Module):
-    def __init__(self, ngf=64, blur_kernel=[1, 3, 3, 1], size=256, part='upper_body'):
-        super().__init__()
-        self.size = size
-        self.part = part
-        self.dp_uv_lookup_256_np = np.load('util/dp_uv_lookup_256.npy')
-        self.uv_parts = torch.from_numpy(np.load('util/uv_space_parts.npy')).unsqueeze(0).unsqueeze(0)
-
-        input_nc = 4 # source RGB and sil
-
-        self.conv1 = ConvLayer(input_nc, ngf, 1)                #  ngf 256 256
-        self.conv2 = ResBlock(ngf, ngf*2, blur_kernel)          # 2ngf 128 128
-        self.conv3 = ResBlock(ngf*2, ngf*4, blur_kernel)        # 4ngf 64  64
-        self.conv4 = ResBlock(ngf*4, ngf*8, blur_kernel)        # 8ngf 32  32
-        self.conv5 = ResBlock(ngf*8, ngf*8, blur_kernel)        # 8ngf 16  16
-        if self.size == 512:
-            self.conv6 = ResBlock(ngf*8, ngf*8, blur_kernel)    # 8ngf 16  16 - starting from ngf 512 512
-        if self.size == 1024:
-            self.conv6 = ResBlock(ngf*8, ngf*8, blur_kernel)
-            self.conv7 = ResBlock(ngf*8, ngf*8, blur_kernel)    # 8ngf 16  16 - starting from ngf 1024 0124
-
-        self.conv11 = EqualConv2d(ngf+1, ngf*8, 1)
-        self.conv21 = EqualConv2d(ngf*2+1, ngf*8, 1)
-        self.conv31 = EqualConv2d(ngf*4+1, ngf*8, 1)
-        self.conv41 = EqualConv2d(ngf*8+1, ngf*8, 1)
-        self.conv51 = EqualConv2d(ngf*8+1, ngf*8, 1)
-        if self.size == 512:
-            self.conv61 = EqualConv2d(ngf*8+1, ngf*8, 1)
-        if self.size == 1024:
-            self.conv61 = EqualConv2d(ngf*8+1, ngf*8, 1)
-            self.conv71 = EqualConv2d(ngf*8+1, ngf*8, 1)
-
-        if self.size == 1024:
-            self.conv13 = EqualConv2d(ngf*8, int(ngf/2), 3, padding=1)
-            self.conv23 = EqualConv2d(ngf*8, ngf*1, 3, padding=1)
-            self.conv33 = EqualConv2d(ngf*8, ngf*2, 3, padding=1)
-            self.conv43 = EqualConv2d(ngf*8, ngf*4, 3, padding=1)
-            self.conv53 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
-            self.conv63 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
-        elif self.size == 512:
-            self.conv13 = EqualConv2d(ngf*8, ngf*1, 3, padding=1)
-            self.conv23 = EqualConv2d(ngf*8, ngf*2, 3, padding=1)
-            self.conv33 = EqualConv2d(ngf*8, ngf*4, 3, padding=1)
-            self.conv43 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
-            self.conv53 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
-        else:
-            self.conv13 = EqualConv2d(ngf*8, ngf*2, 3, padding=1)
-            self.conv23 = EqualConv2d(ngf*8, ngf*4, 3, padding=1)
-            self.conv33 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
-            self.conv43 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
-
-        self.up = nn.Upsample(scale_factor=2)
-
-    def uv2target(self, dp, tex, tex_mask=None):
-        # uv2img
-        b, _, h, w = dp.shape
-        ch = tex.shape[1]
-        UV_MAPs = []
-        for idx in range(b):
-            iuv = dp[idx]
-            point_pos = iuv[0, :, :] > 0
-            iuv_raw_i = iuv[0][point_pos]
-            iuv_raw_u = iuv[1][point_pos]
-            iuv_raw_v = iuv[2][point_pos]
-            iuv_raw = torch.stack([iuv_raw_i,iuv_raw_u,iuv_raw_v], 0)
-            i = iuv_raw[0, :] - 1 ## dp_uv_lookup_256_np does not contain BG class
-            u = iuv_raw[1, :]
-            v = iuv_raw[2, :]
-            i = i.cpu().numpy()
-            u = u.cpu().numpy()
-            v = v.cpu().numpy()
-            uv_smpl = self.dp_uv_lookup_256_np[i, v, u]
-            uv_map = torch.zeros((2,h,w)).to(tex).float()
-            ## being normalize [0,1] to [-1,1] for the grid sample of Pytorch
-            u_map = uv_smpl[:, 0] * 2 - 1
-            v_map = (1 - uv_smpl[:, 1]) * 2 - 1
-            uv_map[0][point_pos] = torch.from_numpy(u_map).to(tex).float()
-            uv_map[1][point_pos] = torch.from_numpy(v_map).to(tex).float()
-            UV_MAPs.append(uv_map)
-        uv_map = torch.stack(UV_MAPs, 0)
-        # warping
-        # before warping validate sizes
-        _, _, h_x, w_x = tex.shape
-        _, _, h_t, w_t = uv_map.shape
-        if h_t != h_x or w_t != w_x:
-            #https://github.com/iPERDance/iPERCore/blob/4a010f781a4fb90dd29a516472e4aadf41ed1609/iPERCore/models/networks/generators/lwb_avg_resunet.py#L55
-            uv_map = torch.nn.functional.interpolate(uv_map, size=(h_x, w_x), mode='bilinear', align_corners=True)
-        uv_map = uv_map.permute(0, 2, 3, 1)
-        warped_image = torch.nn.functional.grid_sample(tex.float(), uv_map.float())
-        if tex_mask is not None:
-            warped_mask = torch.nn.functional.grid_sample(tex_mask.float(), uv_map.float())
-            final_warped = warped_image * warped_mask
-            return final_warped, warped_mask
-        else:
-            return warped_image
-
-    def forward(self, input, pose):
-        coor = input[:,4:6,:,:]
-        target_coor = input[:,10:,:,:]
-        target_input = input[:,6:10,:,:]
-        input = input[:,:4,:,:]
-
-        # input
-        x1 = self.conv1(input)
-        x2 = self.conv2(x1)
-        x3 = self.conv3(x2)
-        x4 = self.conv4(x3)
-        x5 = self.conv5(x4)
-        if self.size == 512:
-            x6 = self.conv6(x5)
-        if self.size == 1024:
-            x6 = self.conv6(x5)
-            x7 = self.conv7(x6)
-        # warp- get flow
-        pose_mask = 1-(pose[:,0, :, :] == 0).float().unsqueeze(1)
-        flow = self.uv2target(pose.int(), coor)
-        # warp- resize flow
-        f1 = torch.nn.functional.interpolate(flow, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
-        f2 = torch.nn.functional.interpolate(flow, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
-        f3 = torch.nn.functional.interpolate(flow, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
-        f4 = torch.nn.functional.interpolate(flow, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
-        f5 = torch.nn.functional.interpolate(flow, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 512:
-            f6 = torch.nn.functional.interpolate(flow, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 1024:
-            f6 = torch.nn.functional.interpolate(flow, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-            f7 = torch.nn.functional.interpolate(flow, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
-        # warp- now warp
-        x1 = torch.nn.functional.grid_sample(x1, f1.permute(0,2,3,1))
-        x2 = torch.nn.functional.grid_sample(x2, f2.permute(0,2,3,1))
-        x3 = torch.nn.functional.grid_sample(x3, f3.permute(0,2,3,1))
-        x4 = torch.nn.functional.grid_sample(x4, f4.permute(0,2,3,1))
-        x5 = torch.nn.functional.grid_sample(x5, f5.permute(0,2,3,1))
-        if self.size == 512:
-            x6 = torch.nn.functional.grid_sample(x6, f6.permute(0,2,3,1))
-        if self.size == 1024:
-            x6 = torch.nn.functional.grid_sample(x6, f6.permute(0,2,3,1))
-            x7 = torch.nn.functional.grid_sample(x7, f7.permute(0,2,3,1))
-        # mask features
-        p1 = torch.nn.functional.interpolate(pose_mask, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
-        p2 = torch.nn.functional.interpolate(pose_mask, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
-        p3 = torch.nn.functional.interpolate(pose_mask, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
-        p4 = torch.nn.functional.interpolate(pose_mask, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
-        p5 = torch.nn.functional.interpolate(pose_mask, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 512:
-            p6 = torch.nn.functional.interpolate(pose_mask, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 1024:
-            p6 = torch.nn.functional.interpolate(pose_mask, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-            p7 = torch.nn.functional.interpolate(pose_mask, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
-        x1 = x1 * p1
-        x2 = x2 * p2
-        x3 = x3 * p3
-        x4 = x4 * p4
-        x5 = x5 * p5
-        if self.size == 512:
-            x6 = x6 * p6
-        if self.size == 1024:
-            x6 = x6 * p6
-            x7 = x7 * p7
-
-        input_x1 = x1
-        input_x2 = x2
-        input_x3 = x3
-        input_x4 = x4
-        input_x5 = x5
-        if self.size == 512:
-            input_x6 = x6
-        if self.size == 1024:
-            input_x6 = x6
-            input_x7 = x7
-
-        # target
-        x1 = self.conv1(target_input)
-        x2 = self.conv2(x1)
-        x3 = self.conv3(x2)
-        x4 = self.conv4(x3)
-        x5 = self.conv5(x4)
-        if self.size == 512:
-            x6 = self.conv6(x5)
-        if self.size == 1024:
-            x6 = self.conv6(x5)
-            x7 = self.conv7(x6)
-        # warp- get flow
-        pose_mask = 1-(pose[:,0, :, :] == 0).float().unsqueeze(1)
-        flow = self.uv2target(pose.int(), target_coor)
-        # warp- resize flow
-        f1 = torch.nn.functional.interpolate(flow, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
-        f2 = torch.nn.functional.interpolate(flow, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
-        f3 = torch.nn.functional.interpolate(flow, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
-        f4 = torch.nn.functional.interpolate(flow, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
-        f5 = torch.nn.functional.interpolate(flow, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 512:
-            f6 = torch.nn.functional.interpolate(flow, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 1024:
-            f6 = torch.nn.functional.interpolate(flow, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-            f7 = torch.nn.functional.interpolate(flow, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
-        # warp- now warp
-        x1 = torch.nn.functional.grid_sample(x1, f1.permute(0,2,3,1))
-        x2 = torch.nn.functional.grid_sample(x2, f2.permute(0,2,3,1))
-        x3 = torch.nn.functional.grid_sample(x3, f3.permute(0,2,3,1))
-        x4 = torch.nn.functional.grid_sample(x4, f4.permute(0,2,3,1))
-        x5 = torch.nn.functional.grid_sample(x5, f5.permute(0,2,3,1))
-        if self.size == 512:
-            x6 = torch.nn.functional.grid_sample(x6, f6.permute(0,2,3,1))
-        if self.size == 1024:
-            x6 = torch.nn.functional.grid_sample(x6, f6.permute(0,2,3,1))
-            x7 = torch.nn.functional.grid_sample(x7, f7.permute(0,2,3,1))
-        # mask features
-        p1 = torch.nn.functional.interpolate(pose_mask, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
-        p2 = torch.nn.functional.interpolate(pose_mask, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
-        p3 = torch.nn.functional.interpolate(pose_mask, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
-        p4 = torch.nn.functional.interpolate(pose_mask, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
-        p5 = torch.nn.functional.interpolate(pose_mask, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 512:
-            p6 = torch.nn.functional.interpolate(pose_mask, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 1024:
-            p6 = torch.nn.functional.interpolate(pose_mask, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-            p7 = torch.nn.functional.interpolate(pose_mask, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
-        x1 = x1 * p1
-        x2 = x2 * p2
-        x3 = x3 * p3
-        x4 = x4 * p4
-        x5 = x5 * p5
-        if self.size == 512:
-            x6 = x6 * p6
-        if self.size == 1024:
-            x6 = x6 * p6
-            x7 = x7 * p7
-
-        target_x1 = x1
-        target_x2 = x2
-        target_x3 = x3
-        target_x4 = x4
-        target_x5 = x5
-        if self.size == 512:
-            target_x6 = x6
-        if self.size == 1024:
-            target_x6 = x6
-            target_x7 = x7
-
-        # body part to transfer
-        target_parts = torch.round(self.uv2target(pose.int(), self.uv_parts.to(pose))).int()
-        if self.part == 'face':
-            face_mask_1 = target_parts==23-1
-            face_mask_2 = target_parts==24-1
-            face_mask = (face_mask_1+face_mask_2).float()
-            part_mask = face_mask
-        elif self.part == 'lower_body':
-            # LOWER CLOTHES: 7,9=UpperLegRight 8,10=UpperLegLeft 11,13=LowerLegRight 12,14=LowerLegLeft
-            lower_mask_1 = target_parts==7-1
-            lower_mask_2 = target_parts==9-1
-            lower_mask_3 = target_parts==8-1
-            lower_mask_4 = target_parts==10-1
-            lower_mask_5 = target_parts==11-1
-            lower_mask_6 = target_parts==13-1
-            lower_mask_7 = target_parts==12-1
-            lower_mask_8 = target_parts==14-1
-            lower_mask = (lower_mask_1+lower_mask_2+lower_mask_3+lower_mask_4+lower_mask_5+lower_mask_6+lower_mask_7+lower_mask_8).float()
-            part_mask = lower_mask
-        else: # upper body
-            # UPPER CLOTHES: 1,2=Torso 15,17=UpperArmLeft 16,18=UpperArmRight 19,21=LowerArmLeft 20,22=LowerArmRight
-            upper_mask_1 = target_parts==1-1
-            upper_mask_2 = target_parts==2-1
-            upper_mask_3 = target_parts==15-1
-            upper_mask_4 = target_parts==17-1
-            upper_mask_5 = target_parts==16-1
-            upper_mask_6 = target_parts==18-1
-            upper_mask_7 = target_parts==19-1
-            upper_mask_8 = target_parts==21-1
-            upper_mask_9 = target_parts==20-1
-            upper_mask_10 = target_parts==22-1
-            upper_mask = (upper_mask_1+upper_mask_2+upper_mask_3+upper_mask_4+upper_mask_5+upper_mask_6+upper_mask_7+upper_mask_8+upper_mask_9+upper_mask_10).float()
-            part_mask = upper_mask
-
-        part_mask1 = torch.nn.functional.interpolate(part_mask, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
-        part_mask2 = torch.nn.functional.interpolate(part_mask, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
-        part_mask3 = torch.nn.functional.interpolate(part_mask, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
-        part_mask4 = torch.nn.functional.interpolate(part_mask, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
-        part_mask5 = torch.nn.functional.interpolate(part_mask, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 512:
-            part_mask6 = torch.nn.functional.interpolate(part_mask, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 1024:
-            part_mask6 = torch.nn.functional.interpolate(part_mask, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-            part_mask7 = torch.nn.functional.interpolate(part_mask, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
-
-        x1 = target_x1*part_mask1 + input_x1*(1-part_mask1)
-        x2 = target_x2*part_mask2 + input_x2*(1-part_mask2)
-        x3 = target_x3*part_mask3 + input_x3*(1-part_mask3)
-        x4 = target_x4*part_mask4 + input_x4*(1-part_mask4)
-        x5 = target_x5*part_mask5 + input_x5*(1-part_mask5)
-        if self.size == 512:
-            x6 = target_x6*part_mask6 + input_x6*(1-part_mask6)
-        if self.size == 1024:
-            x6 = target_x6*part_mask6 + input_x6*(1-part_mask6)
-            x7 = target_x7*part_mask7 + input_x7*(1-part_mask7)
-
-        # fpn
-        if self.size == 1024:
-            F7 = self.conv71(torch.cat([x7,p7], 1))
-            f6 = self.up(F7)+self.conv61(torch.cat([x6,p6], 1))
-            F6 = self.conv63(f6)
-            f5 = self.up(F6)+self.conv51(torch.cat([x5,p5], 1))
-            F5 = self.conv53(f5)
-            f4 = self.up(f5)+self.conv41(torch.cat([x4,p4], 1))
-            F4 = self.conv43(f4)
-            f3 = self.up(f4)+self.conv31(torch.cat([x3,p3], 1))
-            F3 = self.conv33(f3)
-            f2 = self.up(f3)+self.conv21(torch.cat([x2,p2], 1))
-            F2 = self.conv23(f2)
-            f1 = self.up(f2)+self.conv11(torch.cat([x1,p1], 1))
-            F1 = self.conv13(f1)
-        elif self.size == 512:
-            F6 = self.conv61(torch.cat([x6,p6], 1))
-            f5 = self.up(F6)+self.conv51(torch.cat([x5,p5], 1))
-            F5 = self.conv53(f5)
-            f4 = self.up(f5)+self.conv41(torch.cat([x4,p4], 1))
-            F4 = self.conv43(f4)
-            f3 = self.up(f4)+self.conv31(torch.cat([x3,p3], 1))
-            F3 = self.conv33(f3)
-            f2 = self.up(f3)+self.conv21(torch.cat([x2,p2], 1))
-            F2 = self.conv23(f2)
-            f1 = self.up(f2)+self.conv11(torch.cat([x1,p1], 1))
-            F1 = self.conv13(f1)
-        else:
-            F5 = self.conv51(torch.cat([x5,p5], 1))
-            f4 = self.up(F5)+self.conv41(torch.cat([x4,p4], 1))
-            F4 = self.conv43(f4)
-            f3 = self.up(f4)+self.conv31(torch.cat([x3,p3], 1))
-            F3 = self.conv33(f3)
-            f2 = self.up(f3)+self.conv21(torch.cat([x2,p2], 1))
-            F2 = self.conv23(f2)
-            f1 = self.up(f2)+self.conv11(torch.cat([x1,p1], 1))
-            F1 = self.conv13(f1)
-
-        if self.size == 1024:
-            return [F7, F6, F5, F4, F3, F2, F1], part_mask
-        elif self.size == 512:
-            return [F6, F5, F4, F3, F2, F1], part_mask
-        else:
-            return [F5, F4, F3, F2, F1], part_mask
