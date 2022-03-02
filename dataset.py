@@ -57,7 +57,7 @@ class DeepFashionDataset(Dataset):
 
         if self.phase == 'train':
             model_id_list = []
-            with open(os.path.join(self.path,'data_list_train_new.txt')) as f:
+            with open(os.path.join(self.path,'data_list_train.txt')) as f:
                 id = f.readlines()
             model_id_list = list(map(lambda x: x[:-1] if x.endswith('\n') else x, id))
 
@@ -93,7 +93,7 @@ class DeepFashionDataset(Dataset):
 
 
         elif self.phase == 'val':
-            with open(os.path.join(self.path,'data_list_test_new.txt')) as f:
+            with open(os.path.join(self.path,'data_list_test.txt')) as f:
                 id = f.readlines()
             model_id_list = list(map(lambda x: x[:-1] if x.endswith('\n') else x, id))
             self.pairs.append([model_id_list[0], 0, 180])
