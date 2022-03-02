@@ -567,7 +567,7 @@ class SpatialAppearanceEncoder(nn.Module):
         # self.conv41 = EqualConv2d(ngf*8+ngf*4+1, ngf*8, 1)
         # self.conv51 = EqualConv2d(ngf*8+ngf*4+1, ngf*8, 1)
         if self.size == 512:
-            self.conv61 = EqualConv2d(ngf*8+ngf*4+1, ngf*8, 1)
+            self.conv61 = EqualConv2d(ngf*8+ngf*4, ngf*8, 1)
         if self.size == 1024:
             self.conv61 = EqualConv2d(ngf*8+1, ngf*8, 1)
             self.conv71 = EqualConv2d(ngf*8+1, ngf*8, 1)
@@ -620,50 +620,29 @@ class SpatialAppearanceEncoder(nn.Module):
         # todo mask 어떻게 할지
         # pose_mask = 1-(pose[:,0, :, :] == 0).float().unsqueeze(1)
         # warp- resize flow
-        f1 = torch.nn.functional.interpolate(flow, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
-        f2 = torch.nn.functional.interpolate(flow, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
-        f3 = torch.nn.functional.interpolate(flow, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
-        f4 = torch.nn.functional.interpolate(flow, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
-        f5 = torch.nn.functional.interpolate(flow, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
+        # f1 = torch.nn.functional.interpolate(flow, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
+        # f2 = torch.nn.functional.interpolate(flow, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
+        # f3 = torch.nn.functional.interpolate(flow, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
+        # f4 = torch.nn.functional.interpolate(flow, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
+        # f5 = torch.nn.functional.interpolate(flow, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
         if self.size == 512:
             f6 = torch.nn.functional.interpolate(flow, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
         if self.size == 1024:
             f6 = torch.nn.functional.interpolate(flow, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
             f7 = torch.nn.functional.interpolate(flow, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
         # warp- now warp
-        x1 = torch.nn.functional.grid_sample(x1, f1.permute(0,2,3,1))
-        x2 = torch.nn.functional.grid_sample(x2, f2.permute(0,2,3,1))
-        x3 = torch.nn.functional.grid_sample(x3, f3.permute(0,2,3,1))
-        x4 = torch.nn.functional.grid_sample(x4, f4.permute(0,2,3,1))
-        x5 = torch.nn.functional.grid_sample(x5, f5.permute(0,2,3,1))
+        # x1 = torch.nn.functional.grid_sample(x1, f1.permute(0,2,3,1))
+        # x2 = torch.nn.functional.grid_sample(x2, f2.permute(0,2,3,1))
+        # x3 = torch.nn.functional.grid_sample(x3, f3.permute(0,2,3,1))
+        # x4 = torch.nn.functional.grid_sample(x4, f4.permute(0,2,3,1))
+        # x5 = torch.nn.functional.grid_sample(x5, f5.permute(0,2,3,1))
         if self.size == 512:
             x6 = torch.nn.functional.grid_sample(x6, f6.permute(0,2,3,1))
         if self.size == 1024:
             x6 = torch.nn.functional.grid_sample(x6, f6.permute(0,2,3,1))
             x7 = torch.nn.functional.grid_sample(x7, f7.permute(0,2,3,1))
 
-        # mask features
-        p1 = torch.nn.functional.interpolate(sil, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
-        p2 = torch.nn.functional.interpolate(sil, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
-        p3 = torch.nn.functional.interpolate(sil, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
-        p4 = torch.nn.functional.interpolate(sil, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
-        p5 = torch.nn.functional.interpolate(sil, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 512:
-            p6 = torch.nn.functional.interpolate(sil, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 1024:
-            p6 = torch.nn.functional.interpolate(sil, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-            p7 = torch.nn.functional.interpolate(sil, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
 
-        x1 = x1 * p1
-        x2 = x2 * p2
-        x3 = x3 * p3
-        x4 = x4 * p4
-        x5 = x5 * p5
-        if self.size == 512:
-            x6 = x6 * p6
-        if self.size == 1024:
-            x6 = x6 * p6
-            x7 = x7 * p7
         v1 = self.conconv1(condition)
         v2 = self.conconv2(v1)
         v3 = self.conconv3(v2)
@@ -687,7 +666,7 @@ class SpatialAppearanceEncoder(nn.Module):
             f1 = self.up(f2)+self.conv11(torch.cat([x1,p1], 1))
             F1 = self.conv13(f1)
         elif self.size == 512:
-            F6 = self.conv61(torch.cat([x6,p6,v6], 1))
+            F6 = self.conv61(torch.cat([x6,v6], 1))
             # f5 = self.up(F6)+self.conv51(torch.cat([x5,p5,v5], 1))
             # F5 = self.conv53(f5)
             # f4 = self.up(f5)+self.conv41(torch.cat([x4,p4,v4], 1))
