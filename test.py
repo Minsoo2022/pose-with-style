@@ -144,16 +144,27 @@ def generate(args, loader, g_ema, device):
         real_img = data['target_image'].float().to(device)
         flow = data['flow'].float().to(device)
         sil = data['target_sil'].float().to(device)
-        feature = data['feature'].float().to(device)
         pred_img_ori = data['pred_image'].float().to(device)
         attention = data['attention'].float().to(device)
         attention = F.interpolate(attention, size=(args.size, args.size), mode='bilinear', align_corners=True)
-
-        LeftPad = data['target_left_pad'].float().to(device)
-        RightPad = data['target_right_pad'].float().to(device)
-
+        sil = F.interpolate(sil, size=(args.size, args.size))
+        source_sil = data['input_sil'].float().to(device)
         #todo flow 배경부분에 왜 값이 있는지 확인 0.0039정도 있음
         flow = F.interpolate(flow, args.size)
+
+        if source_sil.size(1) == 3:
+            source_sil = source_sil[:,:1]
+
+        if sil.size(1) == 3:
+            sil = sil[:,:1]
+
+        if pred_img_ori.size(3) == 512:
+            pred_img = pred_img_ori.clone()
+            pred_img_ori = F.interpolate(pred_img_ori, size=(256,256))
+        elif pred_img_ori.size(3) == 256:
+            pred_img = F.interpolate(pred_img_ori, size=(args.size, args.size), mode='nearest')
+        else:
+            raise NotImplementedError()
 
         # mask out the padding
         # else only focus on the foreground - initial step of training
@@ -161,12 +172,12 @@ def generate(args, loader, g_ema, device):
         real_img = real_img * sil
 
         # appearance = human foregound + fg mask (pass coor for warping)
-        source_sil = data['input_sil'].float().to(device)
+
         # complete_coor = data['complete_coor'].float().to(device)
         # if args.size == 256:
         #     complete_coor = torch.nn.functional.interpolate(complete_coor, size=(256, 256), mode='bilinear')
         warped_img = F.grid_sample(input_image, flow.permute(0,2,3,1)) * sil
-        pred_img = F.interpolate(pred_img_ori, size=(args.size, args.size), mode='nearest')
+
         if args.finetune:
             appearance = torch.cat([input_image, source_sil], 1)
         else:
@@ -178,7 +189,7 @@ def generate(args, loader, g_ema, device):
         with torch.no_grad():
             g_ema.eval()
             sample, _ = g_ema(appearance=appearance, flow=flow,
-                              sil=sil, input_feat=feature,
+                              sil=sil, input_feat=pred_img_ori,
                               condition=pred_img
                               )
 
@@ -197,54 +208,6 @@ def generate(args, loader, g_ema, device):
                                  f"{data['source_view_id'][j]}.png"),
                 )
 
-            # utils.save_image(
-            #     input_image[:args.n_sample],
-            #     os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_source_{model_id_name}.png"),
-            #     nrow=int(args.n_sample ** 0.5),
-            #     normalize=True,
-            #     range=(-1, 1),
-            # )
-            # utils.save_image(
-            #     real_img[:args.n_sample],
-            #     os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_target_{model_id_name}.png"),
-            #     nrow=int(args.n_sample ** 0.5),
-            #     normalize=True,
-            #     range=(-1, 1),
-            # )
-            # utils.save_image(
-            #     pred_img[:args.n_sample],
-            #     os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_course_{model_id_name}.png"),
-            #     nrow=int(args.n_sample ** 0.5),
-            #     normalize=True,
-            #     range=(-1, 1),
-            # )
-            #
-            # utils.save_image(
-            #     warped_img[:args.n_sample],
-            #     os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_warped_{model_id_name}.png"),
-            #     nrow=int(args.n_sample ** 0.5),
-            #     normalize=True,
-            #     range=(-1, 1),
-            # )
-
-        ## reconstruction loss: L1 and VGG loss + face identity loss
-        #
-        # g_l1 = criterionL1(fake_img, real_img)
-        # g_loss += g_l1
-        # g_vgg = criterionVGG(fake_img, real_img)
-        # g_loss += g_vgg
-        #
-        # loss_dict["g_L1"] = g_l1
-        # loss_dict["g_vgg"] = g_vgg
-        #
-        # if i % 100 == 0:
-        #     print(f'Name: {args.name}')
-        #     print('Epoch: [{0}/{1}] Iter: [{2}/{3}]\t'
-        #             'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'.format(epoch, args.epoch, i, len(loader), batch_time=batch_time)
-        #             +
-        #             f"d: {d_loss_val:.4f}; g: {g_loss_val:.4f}; g_L1: {g_L1_loss_val:.4f}; g_vgg: {g_vgg_loss_val:.4f}; g_cos: {g_cos_loss_val:.4f}; r1: {r1_val:.4f}; "
-        #         )
-        #
 
 
 if __name__ == "__main__":
