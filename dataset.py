@@ -57,7 +57,7 @@ class DeepFashionDataset(Dataset):
 
         if self.phase == 'train':
             model_id_list = []
-            with open(os.path.join(self.path,'data_list_train_new.txt')) as f:
+            with open(os.path.join(self.path,'data_list_train.txt')) as f:
                 id = f.readlines()
             model_id_list = list(map(lambda x: x[:-1] if x.endswith('\n') else x, id))
 
@@ -80,20 +80,31 @@ class DeepFashionDataset(Dataset):
             #                 target_view_id = target_view_id - 360
             #             pair = [model_id, source_view_id, target_view_id]
             #             self.pairs.append(pair)
-            source_view_list = [138, 155, 195, 73, 303, 225, 240, 333, 136, 197, 222, 272, 291, 298, 147, 38, 194,
-                                275, 348, 40, 1, 13, 325, 273, 186]
-            for num, i in enumerate(range(501,526)):
+
+            # source_view_list = [138, 155, 195, 73, 303, 225, 240, 333, 136, 197, 222, 272, 291, 298, 147, 38, 194,
+            #                     275, 348, 40, 1, 13, 325, 273, 186]
+            # for num, i in enumerate(range(501,526)):
+            #     model_id = str(i).zfill(4)
+            #     source_view_id = source_view_list[num]
+            #     target_view_id = source_view_id + 180
+            #     if target_view_id >= 360:
+            #         target_view_id = target_view_id - 360
+            #     pair = [model_id, source_view_id, target_view_id]
+            #     self.pairs.append(pair)
+
+            source_view_list = [0, 90, 180, 270]
+            for num, i in enumerate(range(501, 526)):
                 model_id = str(i).zfill(4)
-                source_view_id = source_view_list[num]
-                target_view_id = source_view_id + 180
-                if target_view_id >= 360:
-                    target_view_id = target_view_id - 360
-                pair = [model_id, source_view_id, target_view_id]
-                self.pairs.append(pair)
+                for source_view_id in source_view_list:
+                    target_view_id = source_view_id + 180
+                    if target_view_id >= 360:
+                        target_view_id = target_view_id - 360
+                    pair = [model_id, source_view_id, target_view_id]
+                    self.pairs.append(pair)
 
 
         elif self.phase == 'val':
-            with open(os.path.join(self.path,'data_list_test_new.txt')) as f:
+            with open(os.path.join(self.path,'data_list_test.txt')) as f:
                 id = f.readlines()
             model_id_list = list(map(lambda x: x[:-1] if x.endswith('\n') else x, id))
             self.pairs.append([model_id_list[0], 0, 180])
@@ -152,27 +163,37 @@ class DeepFashionDataset(Dataset):
         return img, msk
 
     def load_stage1_output(self, data_item, source_view_id, target_view_id, vol_feat_res):
+        if self.phase == 'train' or self.phase == 'val':
+            stage1_dir = 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie'
+
+        elif self.phase == 'test':
+            stage1_dir = 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val_4view_0304_old'
+
         flow_fpath = os.path.join(
-            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val_GCMR', str(data_item).zfill(4),
+            self.path, 'output_stage1', stage1_dir, str(data_item).zfill(4),
             'flow/%04d_%04d.png' % (source_view_id, target_view_id))
         pred_image_fpath = os.path.join(
-            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val_GCMR', str(data_item).zfill(4),
+            self.path, 'output_stage1', stage1_dir, str(data_item).zfill(4),
             'pred_image/%04d_%04d.png' % (source_view_id, target_view_id))
         attention_fpath = os.path.join(
-            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val_GCMR', str(data_item).zfill(4),
+            self.path, 'output_stage1', stage1_dir, str(data_item).zfill(4),
             'attention/%04d_%04d.png' % (source_view_id, target_view_id))
         feature_fpath = os.path.join(
-            self.path, 'output_stage1', 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val_GCMR', str(data_item).zfill(4),
+            self.path, 'output_stage1', stage1_dir, str(data_item).zfill(4),
             'feature/%s/%04d_%04d.npy' % (str(vol_feat_res), source_view_id, target_view_id))
+        target_msk_fpath = os.path.join(
+            self.path, 'output_stage1', stage1_dir, str(data_item).zfill(4),
+            'weight_sum/%04d_%04d.png' % (source_view_id, target_view_id))
         try:
             flow = Image.open(flow_fpath)
             pred_image = Image.open(pred_image_fpath)
             attention = Image.open(attention_fpath)
             feature = np.load(feature_fpath)
+            target_msk = Image.open(target_msk_fpath)
         except:
             print(feature_fpath)
             raise RuntimeError('Failed to load stage1 output: ' + flow_fpath)
-        return flow, pred_image, attention, feature
+        return flow, pred_image, attention, feature, target_msk
 
 
     def __getitem__(self, index):
@@ -180,47 +201,12 @@ class DeepFashionDataset(Dataset):
         # im1_name, im2_name = self.pairs[index]
         model_id, source_view_id, target_view_id = self.pairs[index]
 
-        # # get path to dataset
-        # input_image_path = os.path.join(self.image_root, im1_name)
-        # target_image_path = os.path.join(self.image_root, im2_name)
-        # # dense pose
-        # input_densepose_path = os.path.join(self.densepose_root, im1_name.split('.')[0]+'_iuv.png')
-        # target_densepose_path = os.path.join(self.densepose_root, im2_name.split('.')[0]+'_iuv.png')
-        # # silhouette
-        # input_sil_path = os.path.join(self.parsing_root, im1_name.split('.')[0]+'_sil.png')
-        # target_sil_path = os.path.join(self.parsing_root, im2_name.split('.')[0]+'_sil.png')
-        # # uv space
-        # complete_coor_path = os.path.join(self.uv_root, im1_name.split('.')[0]+'_uv_coor.npy')
-
-        # read data
-        # get original size of data -> for augmentation
-        # input_image_pil = Image.open(input_image_path).convert('RGB')
-
-
-        # orig_w, orig_h = input_image_pil.size
         if self.phase == 'test':
             # set target height and target width
-            if self.size == 512:
-                target_h = 512
-                target_w = 512
-            if self.size == 256:
-                target_h = 256
-                target_w = 256
-            # # images
-            # input_image = self.resize_PIL(input_image_pil, height=target_h, width=target_w, type=Image.ANTIALIAS)
-            # target_image = self.resize_PIL(Image.open(target_image_path).convert('RGB'), height=target_h, width=target_w, type=Image.ANTIALIAS)
-            # # dense pose
-            # input_densepose = np.array(self.resize_PIL(Image.open(input_densepose_path), height=target_h, width=target_w))
-            # target_densepose = np.array(self.resize_PIL(Image.open(target_densepose_path), height=target_h, width=target_w))
-            # # silhouette
-            # silhouette1 = np.array(self.resize_PIL(Image.open(input_sil_path), height=target_h, width=target_w))/255
-            # silhouette2 = np.array(self.resize_PIL(Image.open(target_sil_path), height=target_h, width=target_w))/255
-            # # union with densepose mask for a more accurate mask
-            # silhouette1 = 1-((1-silhouette1) * (input_densepose[:, :, 0] == 0).astype('float'))
             input_image, silhouette1 = self.load_image(model_id, source_view_id)
             target_image, silhouette2 = self.load_image(model_id, target_view_id)
-            flow, pred_image, attention, feature = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
-
+            flow, pred_image, attention, feature, target_msk = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
+            silhouette2 = target_msk
         else:
             # input_image = self.resize_height_PIL(input_image_pil, self.size)
             # target_image = self.resize_height_PIL(Image.open(target_image_path).convert('RGB'), self.size)
@@ -235,7 +221,7 @@ class DeepFashionDataset(Dataset):
             # silhouette2 = 1-((1-silhouette2) * (target_densepose[:, :, 0] == 0).astype('float'))
             input_image, silhouette1 = self.load_image(model_id, source_view_id)
             target_image, silhouette2 = self.load_image(model_id, target_view_id)
-            flow, pred_image, attention, feature = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
+            flow, pred_image, attention, feature, target_msk = self.load_stage1_output(model_id, source_view_id, target_view_id, self.vol_feat_res)
 
         # read uv-space data
         # complete_coor = np.load(complete_coor_path)
@@ -248,14 +234,6 @@ class DeepFashionDataset(Dataset):
         silhouette1 = self.totensor(silhouette1)
         silhouette2 = self.totensor(silhouette2)
         attention = self.totensor(attention)[:1]
-        # Dense Pose
-        # input_densepose = torch.from_numpy(input_densepose).permute(2, 0, 1)
-        # target_densepose = torch.from_numpy(target_densepose).permute(2, 0, 1)
-        # silhouette
-        # silhouette1 = torch.from_numpy(silhouette1).float().unsqueeze(0) # from h,w to c,h,w
-        # silhouette2 = torch.from_numpy(silhouette2).float().unsqueeze(0) # from h,w to c,h,w
-
-        # Our Flow
 
         # put into a square
         input_image, _, silhouette1, Sleft, Sright = self.tensors2square(input_image, flow, silhouette1)
@@ -263,61 +241,13 @@ class DeepFashionDataset(Dataset):
         if Sleft != 0 and Tleft != 0:
             raise NotImplementedError()
 
-        # if self.phase == 'train':
-        #     # remove loaded center shift and add augmentation shift
-        #     loaded_shift = int((orig_h-orig_w)/2)
-        #     complete_coor = ((complete_coor+1)/2)*(orig_h-1) # [-1, 1] to [0, orig_h]
-        #     complete_coor[:,:,0] = complete_coor[:,:,0] - loaded_shift # remove center shift
-        #     complete_coor = ((2*complete_coor/(orig_h-1))-1) # [0, orig_h] (no shift in w) to [-1, 1]
-        #     complete_coor = ((complete_coor+1)/2) * (self.size-1) # [-1, 1] to [0, size] (no shift in w)
-        #     complete_coor[:,:,0] = complete_coor[:,:,0] + Sright # add augmentation shift to w
-        #     complete_coor = ((2*complete_coor/(self.size-1))-1) # [0, size] (with shift in w) to [-1,1]
-        #     # to tensor
-        #     complete_coor = torch.from_numpy(complete_coor).float().permute(2, 0, 1)
-        # else:
-        #     # might have hxw inconsistencies since dp is of different sizes.. fixing this..
-        #     loaded_shift = int((orig_h-orig_w)/2)
-        #     complete_coor = ((complete_coor+1)/2)*(orig_h-1) # [-1, 1] to [0, orig_h]
-        #     complete_coor[:,:,0] = complete_coor[:,:,0] - loaded_shift # remove center shift
-        #     # before: width complete_coor[:,:,0] 0-orig_w-1
-        #     # and    height complete_coor[:,:,1] 0-orig_h-1
-        #     complete_coor[:,:,0] = (complete_coor[:,:,0]/(orig_w-1))*(target_w-1)
-        #     complete_coor[:,:,1] = (complete_coor[:,:,1]/(orig_h-1))*(target_h-1)
-        #     complete_coor[:,:,0] = complete_coor[:,:,0] + Sright # add center shift to w
-        #     complete_coor = ((2*complete_coor/(self.size-1))-1) # [0, size] (with shift in w) to [-1,1]
-        #     # to tensor
-        #     complete_coor = torch.from_numpy(complete_coor).float().permute(2, 0, 1)
 
-
-        # either source or target pass 1:5
-        # if self.phase == 'train':
-        #     choice = random.randint(0, 6)
-        #     if choice == 0:
-        #         # source pass
-        #         target_im = input_image
-        #         target_sil = silhouette1
-        #         target_image_name = source_view_id
-        #         target_left_pad = Sleft
-        #         target_right_pad = Sright
-        #     else:
-        #         # target pass
-        #         target_im = target_image
-        #         target_sil = silhouette2
-        #         target_image_name = target_view_id
-        #         target_left_pad = Tleft
-        #         target_right_pad = Tright
-        # else:
         target_im = target_image
         target_sil = silhouette2
         target_image_name = target_view_id
         target_left_pad = Tleft
         target_right_pad = Tright
 
-        # Get the face transfrom
-        # if self.phase == 'train':
-        #     if target_image_name in self.faceTransform.keys():
-        #         FT = torch.from_numpy(self.faceTransform[target_image_name]).float()
-        #     else:   # no face detected
         FT = torch.zeros((3,3))
 
         # return data

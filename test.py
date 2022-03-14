@@ -148,12 +148,19 @@ def generate(args, loader, g_ema, device):
         pred_img = data['pred_image'].float().to(device)
         attention = data['attention'].float().to(device)
         attention = F.interpolate(attention, size=(args.size, args.size), mode='bilinear', align_corners=True)
-
+        sil = F.interpolate(sil, size=(args.size, args.size))
         LeftPad = data['target_left_pad'].float().to(device)
         RightPad = data['target_right_pad'].float().to(device)
 
         #todo flow 배경부분에 왜 값이 있는지 확인 0.0039정도 있음
         flow = F.interpolate(flow, args.size)
+        source_sil = data['input_sil'].float().to(device)
+        if source_sil.size(1) == 3:
+            source_sil = source_sil[:,:1]
+
+        if sil.size(1) == 3:
+            sil = sil[:,:1]
+
 
         # mask out the padding
         # else only focus on the foreground - initial step of training
@@ -161,7 +168,7 @@ def generate(args, loader, g_ema, device):
         real_img = real_img * sil
 
         # appearance = human foregound + fg mask (pass coor for warping)
-        source_sil = data['input_sil'].float().to(device)
+
         # complete_coor = data['complete_coor'].float().to(device)
         # if args.size == 256:
         #     complete_coor = torch.nn.functional.interpolate(complete_coor, size=(256, 256), mode='bilinear')
