@@ -10,9 +10,10 @@ import pickle
 import cv2 as cv
 
 class DeepFashionDataset(Dataset):
-    def __init__(self, path, phase, size, all_view=False, vol_feat_res=128):
+    def __init__(self, path, stage1_dir, phase, size, all_view=False, vol_feat_res=128):
         # path = /home/nas1_temp/dataset/Thuman
         self.path = path
+        self.stage1_dir = stage1_dir
         self.phase = phase  # train or test
         self.size = size    # 256 or 512  FOR  174x256 or 348x512
         self.vol_feat_res = vol_feat_res
@@ -153,23 +154,23 @@ class DeepFashionDataset(Dataset):
         return img, msk
 
     def load_stage1_output(self, data_item, source_view_id, target_view_id, vol_feat_res):
-        if self.phase == 'train' or self.phase == 'val':
-            stage1_dir = 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie'
-
-        elif self.phase == 'test':
-            stage1_dir = 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val_4view_0304'
+        # if self.phase == 'train' or self.phase == 'val':
+        #     stage1_dir = 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie'
+        #
+        # elif self.phase == 'test':
+        #     stage1_dir = 'pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_val_4view_0304'
 
         flow_fpath = os.path.join(
-            self.path, 'output_stage1', stage1_dir, str(data_item).zfill(4),
+            self.stage1_dir, str(data_item).zfill(4),
             'flow/%04d_%04d.png' % (source_view_id, target_view_id))
         pred_image_fpath = os.path.join(
-            self.path, 'output_stage1', stage1_dir, str(data_item).zfill(4),
+            self.stage1_dir, str(data_item).zfill(4),
             'pred_image/%04d_%04d.png' % (source_view_id, target_view_id))
         attention_fpath = os.path.join(
-            self.path, 'output_stage1', stage1_dir, str(data_item).zfill(4),
+            self.stage1_dir, str(data_item).zfill(4),
             'attention/%04d_%04d.png' % (source_view_id, target_view_id))
         target_msk_fpath = os.path.join(
-            self.path, 'output_stage1', stage1_dir, str(data_item).zfill(4),
+            self.stage1_dir, str(data_item).zfill(4),
             'weight_sum/%04d_%04d.png' % (source_view_id, target_view_id))
 
 

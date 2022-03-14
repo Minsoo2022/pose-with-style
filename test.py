@@ -193,7 +193,7 @@ def generate(args, loader, g_ema, device):
                               condition=pred_img
                               )
 
-            save_path = os.path.join(args.path, 'output_stage2', '/'.join([args.ckpt.split('/')[-2], args.ckpt.split('/')[-1][:-3]]))
+            save_path = os.path.join(args.stage1_dir.replace('output_stage1', 'output_stage2'), '/'.join([args.ckpt.split('/')[-2], args.ckpt.split('/')[-1][:-3]]))
             for j in range(sample.size(0)):
                 os.makedirs(os.path.join(save_path, data['model_id'][j]), exist_ok=True)
 
@@ -216,6 +216,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pose with Style trainer")
 
     parser.add_argument("--path", type=str, default='/home/nas1_temp/dataset/Thuman', help="path to the lmdb dataset")
+    parser.add_argument("--stage1_dir", type=str, default='/home/nas1_temp/dataset/Thuman/output_stage1',
+                        help="path to the lmdb dataset")
     parser.add_argument("--batch", type=int, default=4, help="batch sizes for each gpus")
     parser.add_argument("--workers", type=int, default=4, help="batch sizes for each gpus")
     parser.add_argument("--n_sample", type=int, default=4, help="number of the samples generated during training")
@@ -238,7 +240,7 @@ if __name__ == "__main__":
     checkpoint = torch.load(args.ckpt)
     g_ema.load_state_dict(checkpoint["g_ema"])
 
-    dataset = DeepFashionDataset(args.path, 'test', args.size, args.allview, args.vol_feat_res)
+    dataset = DeepFashionDataset(args.path, args.stage1_dir, 'test', args.size, args.allview, args.vol_feat_res)
 
     loader = data.DataLoader(
 
