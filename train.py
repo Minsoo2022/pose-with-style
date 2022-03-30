@@ -179,7 +179,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
         val_flow = val_data['flow'].float().to(device)
         val_sil = val_data['target_sil'].float().to(device)
         val_pred_img_ori = val_data['pred_image'].float().to(device)
-        val_attention = val_data['attention'].float().to(device)
+        # val_attention = val_data['attention'].float().to(device)
         val_flow = F.interpolate(val_flow, args.size)
         val_real_img = val_real_img * val_sil
         val_source_sil = val_data['input_sil'].float().to(device)
@@ -198,7 +198,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             flow = data['flow'].float().to(device)
             sil = data['target_sil'].float().to(device)
             pred_img_ori = data['pred_image'].float().to(device)
-            attention = data['attention'].float().to(device)
+            # attention = data['attention'].float().to(device)
 
             LeftPad = data['target_left_pad'].float().to(device)
             RightPad = data['target_right_pad'].float().to(device)
@@ -476,12 +476,14 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Pose with Style trainer")
 
-    parser.add_argument("--path", type=str, default='/home/nas1_temp/dataset/Thuman', help="path to the lmdb dataset")
+    # parser.add_argument("--path", type=str, default='/home/nas1_temp/dataset/Thuman', help="path to the lmdb dataset")
+    parser.add_argument("--path", type=str, default='/home/nas1_temp/dataset/tt_dataset', help="path to the lmdb dataset")
     # parser.add_argument("--stage1_dir", type=str, default='/home/nas3_userJ/shimgyumin/fasker/research/pamir/networks/results/validation_256gcmroptmask50_gttrans__pamir_nerf_0302_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_2022_03_06_05_54_57', help="path to the lmdb dataset")
-    parser.add_argument("--stage1_dir", type=str, default='/home/nas1_temp/dataset/Thuman/output_stage1', help= "path to the lmdb dataset")
+    # parser.add_argument("--stage1_dir", type=str, default='/home/nas1_temp/dataset/Thuman/output_stage1/pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie', help= "path to the lmdb dataset")
+    parser.add_argument("--stage1_dir", type=str, default='/home/nas1_temp/dataset/tt_dataset/output_stage1/0329_test', help= "path to the lmdb dataset")
     parser.add_argument("--name", type=str, default='test', help="name of experiment")
-    parser.add_argument("--epoch", type=int, default=50, help="total training epochs")
-    parser.add_argument("--batch", type=int, default=4, help="batch sizes for each gpus")
+    parser.add_argument("--epoch", type=int, default=200, help="total training epochs")
+    parser.add_argument("--batch", type=int, default=1, help="batch sizes for each gpus")
     parser.add_argument("--workers", type=int, default=4, help="batch sizes for each gpus")
     parser.add_argument("--n_sample", type=int, default=4, help="number of the samples generated during training")
     parser.add_argument("--size", type=int, default=512, help="image sizes for the model")
@@ -615,7 +617,7 @@ if __name__ == "__main__":
     )
     val_loader = data.DataLoader(
         val_dataset,
-        batch_size=8,
+        batch_size=1,
         drop_last=True,
         pin_memory=True,
         num_workers=args.workers,

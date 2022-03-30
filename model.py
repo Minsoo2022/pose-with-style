@@ -527,13 +527,19 @@ class InputEncoder(nn.Module):
             convs.append(ResBlock(ngf * 2, ngf * 4, blur_kernel, downsample=True))
             convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=True))
             convs.append(ResBlock(ngf * 8, ngf * 8, blur_kernel, downsample=True))
-        else:
-            raise NotImplementedError()
-        if self.size == 512:
-            convs.append(ResBlock(ngf*8, ngf*8, blur_kernel))
-        if self.size == 1024:
-            convs.append(ResBlock(ngf*8, ngf*8, blur_kernel))
-            convs.append(ResBlock(ngf*8, ngf*8, blur_kernel))
+        elif size == 512:
+            convs.append(ResBlock(ngf, ngf * 2, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 2, ngf * 4, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 8, ngf * 8, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 8, ngf * 8, blur_kernel, downsample=True))
+        # else:
+        #     raise NotImplementedError()
+        # if self.size == 512:
+        #     convs.append(ResBlock(ngf*8, ngf*8, blur_kernel))
+        # if self.size == 1024:
+        #     convs.append(ResBlock(ngf*8, ngf*8, blur_kernel))
+        #     convs.append(ResBlock(ngf*8, ngf*8, blur_kernel))
 
         self.convs = nn.Sequential(*convs)
 
@@ -600,49 +606,6 @@ class SpatialAppearanceEncoder(nn.Module):
 
 
         self.up = nn.Upsample(scale_factor=2)
-
-    def uv2target(self, dp, tex, tex_mask=None):
-        # uv2img
-        b, _, h, w = dp.shape
-        ch = tex.shape[1]
-        UV_MAPs = []
-        for idx in range(b):
-            iuv = dp[idx]
-            point_pos = iuv[0, :, :] > 0
-            iuv_raw_i = iuv[0][point_pos]
-            iuv_raw_u = iuv[1][point_pos]
-            iuv_raw_v = iuv[2][point_pos]
-            iuv_raw = torch.stack([iuv_raw_i,iuv_raw_u,iuv_raw_v], 0)
-            i = iuv_raw[0, :] - 1 ## dp_uv_lookup_256_np does not contain BG class
-            u = iuv_raw[1, :]
-            v = iuv_raw[2, :]
-            i = i.cpu().numpy()
-            u = u.cpu().numpy()
-            v = v.cpu().numpy()
-            uv_smpl = self.dp_uv_lookup_256_np[i, v, u]
-            uv_map = torch.zeros((2,h,w)).to(tex).float()
-            ## being normalize [0,1] to [-1,1] for the grid sample of Pytorch
-            u_map = uv_smpl[:, 0] * 2 - 1
-            v_map = (1 - uv_smpl[:, 1]) * 2 - 1
-            uv_map[0][point_pos] = torch.from_numpy(u_map).to(tex).float()
-            uv_map[1][point_pos] = torch.from_numpy(v_map).to(tex).float()
-            UV_MAPs.append(uv_map)
-        uv_map = torch.stack(UV_MAPs, 0)
-        # warping
-        # before warping validate sizes
-        _, _, h_x, w_x = tex.shape
-        _, _, h_t, w_t = uv_map.shape
-        if h_t != h_x or w_t != w_x:
-            #https://github.com/iPERDance/iPERCore/blob/4a010f781a4fb90dd29a516472e4aadf41ed1609/iPERCore/models/networks/generators/lwb_avg_resunet.py#L55
-            uv_map = torch.nn.functional.interpolate(uv_map, size=(h_x, w_x), mode='bilinear', align_corners=True)
-        uv_map = uv_map.permute(0, 2, 3, 1)
-        warped_image = torch.nn.functional.grid_sample(tex.float(), uv_map.float())
-        if tex_mask is not None:
-            warped_mask = torch.nn.functional.grid_sample(tex_mask.float(), uv_map.float())
-            final_warped = warped_image * warped_mask
-            return final_warped, warped_mask
-        else:
-            return warped_image
 
     def forward(self, input, flow, sil, condition):
         condition = torch.nn.functional.interpolate(condition, size=(self.size, self.size), mode='bilinear', align_corners=True)
@@ -782,7 +745,7 @@ class Generator(nn.Module):
 
         self.appearance_encoder = SpatialAppearanceEncoder(size=size)
         # self.pose_encoder = PoseEncoder(size=size)
-        self.input_encoder = InputEncoder(size=256)
+        self.input_encoder = InputEncoder(size=512)
 
         # StyleGAN
         self.channels = {
@@ -906,16 +869,12 @@ class Generator(nn.Module):
             out = conv2(out, latent[i + 1], noise=noise2)
             skip = to_rgb(out, latent[i + 2], skip)
             i += 2
+        image = skip + condition
 
-        image = skip
-
-        if self.garment_transfer:
-            return image, part_mask
+        if return_latents:
+            return image, latent
         else:
-            if return_latents:
-                return image, latent
-            else:
-                return image, None
+            return image, None
 
 
 class ConvLayer(nn.Sequential):

@@ -101,11 +101,15 @@ class DeepFashionDataset(Dataset):
             self.pairs.append([model_id_list[0], 0, 180])
             self.pairs.append([model_id_list[1], 0, 180])
             self.pairs.append([model_id_list[2], 0, 180])
-            self.pairs.append([model_id_list[3], 0, 180])
+            self.pairs.append([model_id_list[3], 180, 0])
             self.pairs.append([model_id_list[4], 180, 0])
             self.pairs.append([model_id_list[5], 180, 0])
-            self.pairs.append([model_id_list[6], 180, 0])
-            self.pairs.append([model_id_list[7], 180, 0])
+            self.pairs.append([model_id_list[-1], 0, 180])
+            self.pairs.append([model_id_list[-2], 0, 180])
+            self.pairs.append([model_id_list[-3], 0, 180])
+            self.pairs.append([model_id_list[-4], 180, 0])
+            self.pairs.append([model_id_list[-5], 180, 0])
+            self.pairs.append([model_id_list[-6], 180, 0])
 
 
         print('Loading data pairs finished ...')
@@ -140,8 +144,10 @@ class DeepFashionDataset(Dataset):
         return im, pose, sil, left, right
 
     def load_image(self, data_item, view_id):
+        # img_fpath = os.path.join(
+        #     self.path, 'image_data_nolight2', str(data_item).zfill(4), 'color_re/%04d.jpg' % view_id)
         img_fpath = os.path.join(
-            self.path, 'image_data_nolight2', str(data_item).zfill(4), 'color_re/%04d.jpg' % view_id)
+            self.path, 'image_data', str(data_item).zfill(4), 'color/%04d.jpg' % view_id)
         msk_fpath = os.path.join(
             self.path, 'image_data', str(data_item).zfill(4), 'mask/%04d.png' % view_id)
         try:
@@ -174,14 +180,14 @@ class DeepFashionDataset(Dataset):
             'weight_sum/%04d_%04d.png' % (source_view_id, target_view_id))
 
 
-        try:
-            flow = Image.open(flow_fpath)
-            pred_image = Image.open(pred_image_fpath)
-            attention = Image.open(attention_fpath)
-            target_msk = Image.open(target_msk_fpath)
-        except:
-            raise RuntimeError('Failed to load stage1 output: ' + flow_fpath)
-        return flow, pred_image, attention, target_msk
+        # try:
+        flow = Image.open(flow_fpath)
+        pred_image = Image.open(pred_image_fpath)
+        # attention = Image.open(attention_fpath)
+        target_msk = Image.open(target_msk_fpath)
+        # except:
+        #     raise RuntimeError('Failed to load stage1 output: ' + flow_fpath)
+        return flow, pred_image, None, target_msk
 
 
     def __getitem__(self, index):
@@ -210,7 +216,7 @@ class DeepFashionDataset(Dataset):
         pred_image = self.transform(pred_image)
         silhouette1 = self.totensor(silhouette1)
         silhouette2 = self.totensor(silhouette2)
-        attention = self.totensor(attention)[:1]
+        # attention = self.totensor(attention)[:1]
 
         # put into a square
         input_image, _, silhouette1, Sleft, Sright = self.tensors2square(input_image, flow, silhouette1)
@@ -231,7 +237,7 @@ class DeepFashionDataset(Dataset):
         if self.phase == 'train':
             save_name = str(model_id).zfill(4) + '_' + str(source_view_id).zfill(4) + '_2_' + str(source_view_id).zfill(
                 4) + '_vis.png'
-            return {'input_image':input_image, 'target_image':target_im, 'pred_image': pred_image, 'attention': attention,
+            return {'input_image':input_image, 'target_image':target_im, 'pred_image': pred_image, # 'attention': attention,
                     'target_sil': target_sil,
                     'flow': flow,
                     'TargetFaceTransform': FT,
@@ -244,7 +250,7 @@ class DeepFashionDataset(Dataset):
 
         else:
             save_name = str(model_id).zfill(4) + '_' + str(source_view_id).zfill(4) + '_2_' + str(source_view_id).zfill(4) + '_vis.png'
-            return {'input_image':input_image, 'target_image':target_im, 'pred_image': pred_image, 'attention': attention,
+            return {'input_image':input_image, 'target_image':target_im, 'pred_image': pred_image, # 'attention': attention,
                     'target_sil': target_sil,
                     'target_left_pad':torch.tensor(target_left_pad),
                     'target_right_pad':torch.tensor(target_right_pad),
@@ -358,11 +364,11 @@ class InferenceDataset(Dataset):
         try:
             flow = Image.open(flow_fpath)
             pred_image = Image.open(pred_image_fpath)
-            attention = Image.open(attention_fpath)
+            # attention = Image.open(attention_fpath)
             target_msk = Image.open(target_msk_fpath)
         except:
             raise RuntimeError('Failed to load stage1 output: ' + flow_fpath)
-        return flow, pred_image, attention, target_msk
+        return flow, pred_image, None, target_msk
 
 
     def __getitem__(self, index):
@@ -380,7 +386,7 @@ class InferenceDataset(Dataset):
         pred_image = self.transform(pred_image)
         silhouette1 = self.totensor(silhouette1)
         silhouette2 = self.totensor(silhouette2)
-        attention = self.totensor(attention)[:1]
+        # attention = self.totensor(attention)[:1]
 
         # put into a square
         input_image, _, silhouette1, Sleft, Sright = self.tensors2square(input_image, flow, silhouette1)
@@ -395,7 +401,7 @@ class InferenceDataset(Dataset):
 
 
         save_name = str(model_id).zfill(4) + '_' + str(source_view_id).zfill(4) + '_2_' + str(source_view_id).zfill(4) + '_vis.png'
-        return {'input_image':input_image, 'pred_image': pred_image, 'attention': attention,
+        return {'input_image':input_image, 'pred_image': pred_image, # 'attention': attention,
                 'target_sil': target_sil,
                 'flow': flow,
                 'input_sil': silhouette1,
