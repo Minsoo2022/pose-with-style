@@ -617,7 +617,7 @@ if __name__ == "__main__":
     )
     val_loader = data.DataLoader(
         val_dataset,
-        batch_size=1,
+        batch_size=8,
         drop_last=True,
         pin_memory=True,
         num_workers=args.workers,

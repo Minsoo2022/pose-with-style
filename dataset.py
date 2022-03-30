@@ -102,14 +102,14 @@ class DeepFashionDataset(Dataset):
             self.pairs.append([model_id_list[1], 0, 180])
             self.pairs.append([model_id_list[2], 0, 180])
             self.pairs.append([model_id_list[3], 180, 0])
-            self.pairs.append([model_id_list[4], 180, 0])
-            self.pairs.append([model_id_list[5], 180, 0])
+            # self.pairs.append([model_id_list[4], 180, 0])
+            # self.pairs.append([model_id_list[5], 180, 0])
             self.pairs.append([model_id_list[-1], 0, 180])
             self.pairs.append([model_id_list[-2], 0, 180])
             self.pairs.append([model_id_list[-3], 0, 180])
             self.pairs.append([model_id_list[-4], 180, 0])
-            self.pairs.append([model_id_list[-5], 180, 0])
-            self.pairs.append([model_id_list[-6], 180, 0])
+            # self.pairs.append([model_id_list[-5], 180, 0])
+            # self.pairs.append([model_id_list[-6], 180, 0])
 
 
         print('Loading data pairs finished ...')
