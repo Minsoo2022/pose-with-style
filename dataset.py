@@ -83,15 +83,35 @@ class DeepFashionDataset(Dataset):
             #     pair = [model_id, source_view_id, target_view_id]
             #     self.pairs.append(pair)
 
-            source_view_list = [0, 90, 180, 270]
-            for num, i in enumerate(range(501, 526)):
-                model_id = str(i).zfill(4)
-                for source_view_id in source_view_list:
-                    target_view_id = source_view_id + 180
-                    if target_view_id >= 360:
-                        target_view_id = target_view_id - 360
-                    pair = [model_id, source_view_id, target_view_id]
-                    self.pairs.append(pair)
+            # source_view_list = [0, 90, 180, 270]
+            # for num, i in enumerate(range(501, 526)):
+            #     model_id = str(i).zfill(4)
+            #     for source_view_id in source_view_list:
+            #         target_view_id = source_view_id + 180
+            #         if target_view_id >= 360:
+            #             target_view_id = target_view_id - 360
+            #         pair = [model_id, source_view_id, target_view_id]
+            #         self.pairs.append(pair)
+
+            if 'thuman' in self.stage1_dir:
+                data_name = 'thuman'
+            elif 'twindom' in self.stage1_dir:
+                data_name = 'twindom'
+            else:
+                raise NotImplementedError()
+
+            with open(os.path.join(self.path,f'data_list_test_{data_name}.txt')) as f:
+                id = f.readlines()
+            model_id_list = list(map(lambda x: x[:-1] if x.endswith('\n') else x, id))
+
+            for model_id in model_id_list:
+                for source_view_id in [0, 90, 180, 270]:
+                    for target_veiw_diff in [180]:
+                        target_view_id = target_veiw_diff + source_view_id
+                        if target_view_id >= 360:
+                            target_view_id = target_view_id - 360
+                        pair = [model_id, source_view_id, target_view_id]
+                        self.pairs.append(pair)
 
 
         elif self.phase == 'val':
