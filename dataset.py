@@ -315,7 +315,7 @@ class InferenceDataset(Dataset):
         # for i in range(len(pairs_file)):
         #     pair = [pairs_file.iloc[i]['from'], pairs_file.iloc[i]['to']]
         #     self.pairs.append(pair)
-        model_id_list = os.listdir(os.path.join(self.path, 'stage1_outputs'))
+        model_id_list = os.listdir(os.path.join(self.path, 'output_stage1'))
         for model_id in model_id_list:
             source_view_id = 0
             target_view_id = source_view_id + 180
@@ -354,9 +354,9 @@ class InferenceDataset(Dataset):
 
     def load_image(self, data_item):
         img_fpath = os.path.join(
-            self.path, 'image', data_item + '.jpg')
+            self.path, '../', 'image', data_item + '.jpg')
         msk_fpath = os.path.join(
-            self.path, 'image', data_item + '_mask.png')
+            self.path, '../', 'image', data_item + '_mask.png')
 
         try:
             img = Image.open(img_fpath).convert('RGB')
@@ -369,16 +369,16 @@ class InferenceDataset(Dataset):
 
     def load_stage1_output(self, data_item, source_view_id, target_view_id):
         flow_fpath = os.path.join(
-            self.path, 'stage1_outputs', data_item,
+            self.path, 'output_stage1', data_item,
             'flow/%04d_%04d.png' % (source_view_id, target_view_id))
         pred_image_fpath = os.path.join(
-            self.path, 'stage1_outputs', data_item,
+            self.path, 'output_stage1', data_item,
             'pred_image/%04d_%04d.png' % (source_view_id, target_view_id))
         attention_fpath = os.path.join(
-            self.path, 'stage1_outputs', data_item,
+            self.path, 'output_stage1', data_item,
             'attention/%04d_%04d.png' % (source_view_id, target_view_id))
         target_msk_fpath = os.path.join(
-            self.path, 'stage1_outputs', data_item,
+            self.path, 'output_stage1', data_item,
             'weight_sum/%04d_%04d.png' % (source_view_id, target_view_id))
 
         try:
