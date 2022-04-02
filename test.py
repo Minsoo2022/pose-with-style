@@ -145,8 +145,8 @@ def generate(args, loader, g_ema, device):
         flow = data['flow'].float().to(device)
         sil = data['target_sil'].float().to(device)
         pred_img_ori = data['pred_image'].float().to(device)
-        attention = data['attention'].float().to(device)
-        attention = F.interpolate(attention, size=(args.size, args.size), mode='bilinear', align_corners=True)
+        # attention = data['attention'].float().to(device)
+        # attention = F.interpolate(attention, size=(args.size, args.size), mode='bilinear', align_corners=True)
         sil = F.interpolate(sil, size=(args.size, args.size))
         source_sil = data['input_sil'].float().to(device)
         #todo flow 배경부분에 왜 값이 있는지 확인 0.0039정도 있음
@@ -160,7 +160,7 @@ def generate(args, loader, g_ema, device):
 
         if pred_img_ori.size(3) == 512:
             pred_img = pred_img_ori.clone()
-            pred_img_ori = F.interpolate(pred_img_ori, size=(256,256))
+            # pred_img_ori = F.interpolate(pred_img_ori, size=(256,256))
         elif pred_img_ori.size(3) == 256:
             pred_img = F.interpolate(pred_img_ori, size=(args.size, args.size), mode='nearest')
         else:
@@ -179,12 +179,12 @@ def generate(args, loader, g_ema, device):
         warped_img = F.grid_sample(input_image, flow.permute(0,2,3,1)) * sil
 
         if args.finetune:
-            appearance = torch.cat([input_image, source_sil], 1)
+            appearance = torch.cat([pred_img, source_sil], 1)
         else:
             if args.allview:
-                appearance = torch.cat([input_image * source_sil, source_sil, attention], 1)
+                appearance = torch.cat([pred_img * sil, source_sil], 1)
             else:
-                appearance = torch.cat([input_image * source_sil, source_sil], 1)
+                appearance = torch.cat([pred_img * sil, source_sil], 1)
 
         with torch.no_grad():
             g_ema.eval()
@@ -208,6 +208,11 @@ def generate(args, loader, g_ema, device):
                                  f"{data['source_view_id'][j]}.png"),
                 )
 
+                utils.save_image(
+                    (pred_img[j] / 2 + 0.5) * sil[j] + (1 - sil[j]),  # * (1- )
+                    os.path.join(os.path.join(save_path, data['model_id'][j]),
+                                 f"{data['source_view_id'][j]}_{data['target_view_id'][j]}_coarse.png"),
+                )
 
 
 if __name__ == "__main__":
@@ -215,8 +220,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Pose with Style trainer")
 
-    parser.add_argument("--path", type=str, default='/home/nas1_temp/dataset/Thuman', help="path to the lmdb dataset")
-    parser.add_argument("--stage1_dir", type=str, default='/home/nas1_temp/dataset/Thuman/output_stage1',
+    # parser.add_argument("--path", type=str, default='/home/nas1_temp/dataset/Thuman', help="path to the lmdb dataset")
+    parser.add_argument("--path", type=str, default='/home/nas1_temp/dataset/tt_dataset', help="path to the lmdb dataset")
+    parser.add_argument("--stage1_dir", type=str, default='/home/nas1_temp/dataset/tt_dataset/output_stage1',
                         help="path to the lmdb dataset")
     parser.add_argument("--batch", type=int, default=4, help="batch sizes for each gpus")
     parser.add_argument("--workers", type=int, default=4, help="batch sizes for each gpus")
