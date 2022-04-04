@@ -837,7 +837,7 @@ class Generator(nn.Module):
                 ]
 
 
-        out = self.input_encoder(input_feat)
+        out = self.input_encoder(input_img, input_feat)
         out = self.conv1(out, encoded_style, noise=noise[0])
         skip = self.to_rgb1(out, encoded_style)
 
