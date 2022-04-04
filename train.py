@@ -187,9 +187,9 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
         val_pred_img = F.interpolate(val_pred_img_ori, size=(args.size, args.size), mode='nearest')
 
         if args.finetune:
-            val_appearance = torch.cat([val_input_image, val_source_sil], 1)
+            val_appearance = torch.cat([val_pred_img, val_sil], 1)
         else:
-            val_appearance = torch.cat([val_input_image * val_source_sil, val_source_sil], 1)
+            val_appearance = torch.cat([val_pred_img * val_sil, val_source_sil], 1)
 
         for i, data in enumerate(loader):
             batch_start_time = time.time()
@@ -229,9 +229,9 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             # if args.size == 256:
             #     complete_coor = torch.nn.functional.interpolate(complete_coor, size=(256, 256), mode='bilinear')
             if args.finetune:
-                appearance = torch.cat([input_image, source_sil], 1)
+                appearance = torch.cat([pred_img, sil], 1)
             else:
-                appearance = torch.cat([input_image * source_sil, source_sil], 1)
+                appearance = torch.cat([pred_img * sil, sil], 1)
 
 
             ############ Optimize Discriminator ############
