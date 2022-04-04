@@ -530,7 +530,7 @@ class InputEncoder(nn.Module):
         elif size == 512:
             convs.append(ResBlock(ngf, ngf * 2, blur_kernel, downsample=True))
             convs.append(ResBlock(ngf * 2, ngf * 4, blur_kernel, downsample=True))
-            convs.append(ResBlock(ngf * 4, ngf * 8, blur_kernel, downsample=True))
+            convs.append(ResBlock(ngf * 4 + 128, ngf * 8, blur_kernel, downsample=True))
             convs.append(ResBlock(ngf * 8, ngf * 8, blur_kernel, downsample=True))
             convs.append(ResBlock(ngf * 8, ngf * 8, blur_kernel, downsample=True))
         # else:
@@ -543,8 +543,14 @@ class InputEncoder(nn.Module):
 
         self.convs = nn.Sequential(*convs)
 
-    def forward(self, input):
-        out = self.convs(input)
+    def forward(self, input_img, input_feature):
+        for i, layer in enumerate(self.convs):
+            if i == 0:
+                out = layer(input_img)
+            elif i == 3:
+                out = layer(torch.cat((out, input_feature), dim=1))
+            else:
+                out = layer(out)
         return out
 
 
@@ -824,6 +830,7 @@ class Generator(nn.Module):
         flow,
         appearance,
         sil,
+        input_img,
         input_feat,
         condition,
         styles=None,
@@ -857,7 +864,7 @@ class Generator(nn.Module):
         for i in range(length):
             latent += [styles[i+1],styles[i+1]]
 
-        out = self.input_encoder(input_feat)
+        out = self.input_encoder(input_img, input_feat)
         out = self.conv1(out, latent[0], noise=noise[0])
         skip = self.to_rgb1(out, latent[1])
 
@@ -869,7 +876,7 @@ class Generator(nn.Module):
             out = conv2(out, latent[i + 1], noise=noise2)
             skip = to_rgb(out, latent[i + 2], skip)
             i += 2
-        image = skip + condition
+        image = skip
 
         if return_latents:
             return image, latent
