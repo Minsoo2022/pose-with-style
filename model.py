@@ -573,35 +573,35 @@ class SpatialAppearanceEncoder(nn.Module):
             self.conv6 = ResBlock(ngf*8, ngf*8, blur_kernel)
             self.conv7 = ResBlock(ngf*8, ngf*8, blur_kernel)    # 8ngf 16  16 - starting from ngf 1024 0124
 
-        self.conv11 = EqualConv2d(ngf+ngf+1, ngf*8, 1)
-        self.conv21 = EqualConv2d(ngf*2+ngf*2+1, ngf*8, 1)
-        self.conv31 = EqualConv2d(ngf*4+ngf*4+1, ngf*8, 1)
-        self.conv41 = EqualConv2d(ngf*8+ngf*4+1, ngf*8, 1)
-        self.conv51 = EqualConv2d(ngf*8+ngf*4+1, ngf*8, 1)
+        # self.conv11 = EqualConv2d(ngf+ngf+1, ngf*8, 1)
+        # self.conv21 = EqualConv2d(ngf*2+ngf*2+1, ngf*8, 1)
+        # self.conv31 = EqualConv2d(ngf*4+ngf*4+1, ngf*8, 1)
+        # self.conv41 = EqualConv2d(ngf*8+ngf*4+1, ngf*8, 1)
+        # self.conv51 = EqualConv2d(ngf*8+ngf*4+1, ngf*8, 1)
         if self.size == 512:
-            self.conv61 = EqualConv2d(ngf*8+ngf*4+1, ngf*8, 1)
+            self.conv61 = EqualConv2d(ngf*8+ngf*4, ngf*8, 1)
         if self.size == 1024:
             self.conv61 = EqualConv2d(ngf*8+1, ngf*8, 1)
             self.conv71 = EqualConv2d(ngf*8+1, ngf*8, 1)
 
-        if self.size == 1024:
-            self.conv13 = EqualConv2d(ngf*8, int(ngf/2), 3, padding=1)
-            self.conv23 = EqualConv2d(ngf*8, ngf*1, 3, padding=1)
-            self.conv33 = EqualConv2d(ngf*8, ngf*2, 3, padding=1)
-            self.conv43 = EqualConv2d(ngf*8, ngf*4, 3, padding=1)
-            self.conv53 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
-            self.conv63 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
-        elif self.size == 512:
-            self.conv13 = EqualConv2d(ngf*8, ngf*1, 3, padding=1)
-            self.conv23 = EqualConv2d(ngf*8, ngf*2, 3, padding=1)
-            self.conv33 = EqualConv2d(ngf*8, ngf*4, 3, padding=1)
-            self.conv43 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
-            self.conv53 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
-        else:
-            self.conv13 = EqualConv2d(ngf*8, ngf*2, 3, padding=1)
-            self.conv23 = EqualConv2d(ngf*8, ngf*4, 3, padding=1)
-            self.conv33 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
-            self.conv43 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
+        # if self.size == 1024:
+        #     self.conv13 = EqualConv2d(ngf*8, int(ngf/2), 3, padding=1)
+        #     self.conv23 = EqualConv2d(ngf*8, ngf*1, 3, padding=1)
+        #     self.conv33 = EqualConv2d(ngf*8, ngf*2, 3, padding=1)
+        #     self.conv43 = EqualConv2d(ngf*8, ngf*4, 3, padding=1)
+        #     self.conv53 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
+        #     self.conv63 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
+        # elif self.size == 512:
+        #     self.conv13 = EqualConv2d(ngf*8, ngf*1, 3, padding=1)
+        #     self.conv23 = EqualConv2d(ngf*8, ngf*2, 3, padding=1)
+        #     self.conv33 = EqualConv2d(ngf*8, ngf*4, 3, padding=1)
+        #     self.conv43 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
+        #     self.conv53 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
+        # else:
+        #     self.conv13 = EqualConv2d(ngf*8, ngf*2, 3, padding=1)
+        #     self.conv23 = EqualConv2d(ngf*8, ngf*4, 3, padding=1)
+        #     self.conv33 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
+        #     self.conv43 = EqualConv2d(ngf*8, ngf*8, 3, padding=1)
 
         self.conconv1 = ConvLayer(input_condition_nc, ngf, 1)            # 128 128
         self.conconv2 = ResBlock(ngf, ngf*2, blur_kernel)          # 64 64
@@ -631,50 +631,29 @@ class SpatialAppearanceEncoder(nn.Module):
         # todo mask 어떻게 할지
         # pose_mask = 1-(pose[:,0, :, :] == 0).float().unsqueeze(1)
         # warp- resize flow
-        f1 = torch.nn.functional.interpolate(flow, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
-        f2 = torch.nn.functional.interpolate(flow, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
-        f3 = torch.nn.functional.interpolate(flow, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
-        f4 = torch.nn.functional.interpolate(flow, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
-        f5 = torch.nn.functional.interpolate(flow, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
+        # f1 = torch.nn.functional.interpolate(flow, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
+        # f2 = torch.nn.functional.interpolate(flow, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
+        # f3 = torch.nn.functional.interpolate(flow, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
+        # f4 = torch.nn.functional.interpolate(flow, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
+        # f5 = torch.nn.functional.interpolate(flow, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
         if self.size == 512:
             f6 = torch.nn.functional.interpolate(flow, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
         if self.size == 1024:
             f6 = torch.nn.functional.interpolate(flow, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
             f7 = torch.nn.functional.interpolate(flow, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
         # warp- now warp
-        x1 = torch.nn.functional.grid_sample(x1, f1.permute(0,2,3,1))
-        x2 = torch.nn.functional.grid_sample(x2, f2.permute(0,2,3,1))
-        x3 = torch.nn.functional.grid_sample(x3, f3.permute(0,2,3,1))
-        x4 = torch.nn.functional.grid_sample(x4, f4.permute(0,2,3,1))
-        x5 = torch.nn.functional.grid_sample(x5, f5.permute(0,2,3,1))
+        # x1 = torch.nn.functional.grid_sample(x1, f1.permute(0,2,3,1))
+        # x2 = torch.nn.functional.grid_sample(x2, f2.permute(0,2,3,1))
+        # x3 = torch.nn.functional.grid_sample(x3, f3.permute(0,2,3,1))
+        # x4 = torch.nn.functional.grid_sample(x4, f4.permute(0,2,3,1))
+        # x5 = torch.nn.functional.grid_sample(x5, f5.permute(0,2,3,1))
         if self.size == 512:
             x6 = torch.nn.functional.grid_sample(x6, f6.permute(0,2,3,1))
         if self.size == 1024:
             x6 = torch.nn.functional.grid_sample(x6, f6.permute(0,2,3,1))
             x7 = torch.nn.functional.grid_sample(x7, f7.permute(0,2,3,1))
 
-        # mask features
-        p1 = torch.nn.functional.interpolate(sil, size=(x1.shape[2], x1.shape[3]), mode='bilinear', align_corners=True)
-        p2 = torch.nn.functional.interpolate(sil, size=(x2.shape[2], x2.shape[3]), mode='bilinear', align_corners=True)
-        p3 = torch.nn.functional.interpolate(sil, size=(x3.shape[2], x3.shape[3]), mode='bilinear', align_corners=True)
-        p4 = torch.nn.functional.interpolate(sil, size=(x4.shape[2], x4.shape[3]), mode='bilinear', align_corners=True)
-        p5 = torch.nn.functional.interpolate(sil, size=(x5.shape[2], x5.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 512:
-            p6 = torch.nn.functional.interpolate(sil, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-        if self.size == 1024:
-            p6 = torch.nn.functional.interpolate(sil, size=(x6.shape[2], x6.shape[3]), mode='bilinear', align_corners=True)
-            p7 = torch.nn.functional.interpolate(sil, size=(x7.shape[2], x7.shape[3]), mode='bilinear', align_corners=True)
 
-        x1 = x1 * p1
-        x2 = x2 * p2
-        x3 = x3 * p3
-        x4 = x4 * p4
-        x5 = x5 * p5
-        if self.size == 512:
-            x6 = x6 * p6
-        if self.size == 1024:
-            x6 = x6 * p6
-            x7 = x7 * p7
         v1 = self.conconv1(condition)
         v2 = self.conconv2(v1)
         v3 = self.conconv3(v2)
@@ -698,17 +677,17 @@ class SpatialAppearanceEncoder(nn.Module):
             f1 = self.up(f2)+self.conv11(torch.cat([x1,p1], 1))
             F1 = self.conv13(f1)
         elif self.size == 512:
-            F6 = self.conv61(torch.cat([x6,p6,v6], 1))
-            f5 = self.up(F6)+self.conv51(torch.cat([x5,p5,v5], 1))
-            F5 = self.conv53(f5)
-            f4 = self.up(f5)+self.conv41(torch.cat([x4,p4,v4], 1))
-            F4 = self.conv43(f4)
-            f3 = self.up(f4)+self.conv31(torch.cat([x3,p3,v3], 1))
-            F3 = self.conv33(f3)
-            f2 = self.up(f3)+self.conv21(torch.cat([x2,p2,v2], 1))
-            F2 = self.conv23(f2)
-            f1 = self.up(f2)+self.conv11(torch.cat([x1,p1,v1], 1))
-            F1 = self.conv13(f1)
+            F6 = self.conv61(torch.cat([x6,v6], 1))
+            # f5 = self.up(F6)+self.conv51(torch.cat([x5,p5,v5], 1))
+            # F5 = self.conv53(f5)
+            # f4 = self.up(f5)+self.conv41(torch.cat([x4,p4,v4], 1))
+            # F4 = self.conv43(f4)
+            # f3 = self.up(f4)+self.conv31(torch.cat([x3,p3,v3], 1))
+            # F3 = self.conv33(f3)
+            # f2 = self.up(f3)+self.conv21(torch.cat([x2,p2,v2], 1))
+            # F2 = self.conv23(f2)
+            # f1 = self.up(f2)+self.conv11(torch.cat([x1,p1,v1], 1))
+            # F1 = self.conv13(f1)
         else:
             F5 = self.conv51(torch.cat([x5,p5], 1))
             f4 = self.up(F5)+self.conv41(torch.cat([x4,p4], 1))
@@ -723,7 +702,7 @@ class SpatialAppearanceEncoder(nn.Module):
         if self.size == 1024:
             return [F7, F6, F5, F4, F3, F2, F1]
         elif self.size == 512:
-            return [F6, F5, F4, F3, F2, F1]
+            return [F6]
         else:
             return [F5, F4, F3, F2, F1]
 
@@ -752,6 +731,7 @@ class Generator(nn.Module):
         self.appearance_encoder = SpatialAppearanceEncoder(size=size)
         # self.pose_encoder = PoseEncoder(size=size)
         self.input_encoder = InputEncoder(size=512)
+        self.style_encoder = ResBlock(512, style_dim, blur_kernel, downsample=True)
 
         # StyleGAN
         self.channels = {
@@ -765,9 +745,9 @@ class Generator(nn.Module):
         }
 
         self.conv1 = StyledConv(
-            self.channels[16], self.channels[16], 3, style_dim, blur_kernel=blur_kernel, spatial=True
+            self.channels[16], self.channels[16], 3, style_dim, blur_kernel=blur_kernel, spatial=False
         )
-        self.to_rgb1 = ToRGB(self.channels[16], style_dim, upsample=False, spatial=True)
+        self.to_rgb1 = ToRGB(self.channels[16], style_dim, upsample=False, spatial=False)
 
         self.log_size = int(math.log(size, 2))
         self.num_layers = (self.log_size - 4) * 2 + 1
@@ -790,17 +770,17 @@ class Generator(nn.Module):
                     style_dim,
                     upsample=True,
                     blur_kernel=blur_kernel,
-                    spatial=True,
+                    spatial=False,
                 )
             )
 
             self.convs.append(
                 StyledConv(
-                    out_channel, out_channel, 3, style_dim, blur_kernel=blur_kernel, spatial=True,
+                    out_channel, out_channel, 3, style_dim, blur_kernel=blur_kernel, spatial=False,
                 )
             )
 
-            self.to_rgbs.append(ToRGB(out_channel, style_dim, spatial=True))
+            self.to_rgbs.append(ToRGB(out_channel, style_dim, spatial=False))
 
             in_channel = out_channel
 
@@ -845,6 +825,8 @@ class Generator(nn.Module):
 
 
         styles = self.appearance_encoder(appearance, flow, sil, condition)
+        encoded_style = self.style_encoder(styles[0])
+        encoded_style = F.max_pool2d(encoded_style, 8).squeeze(-1).squeeze(-1)
 
         if noise is None:
             if randomize_noise:
@@ -854,34 +836,22 @@ class Generator(nn.Module):
                     getattr(self.noises, f"noise_{i}") for i in range(self.num_layers)
                 ]
 
-        latent = [styles[0], styles[0]]
-        if self.size == 1024:
-            length = 6
-        elif self.size == 512:
-            length = 5
-        else:
-            length = 4
-        for i in range(length):
-            latent += [styles[i+1],styles[i+1]]
 
-        out = self.input_encoder(input_img, input_feat)
-        out = self.conv1(out, latent[0], noise=noise[0])
-        skip = self.to_rgb1(out, latent[1])
+        out = self.input_encoder(input_feat)
+        out = self.conv1(out, encoded_style, noise=noise[0])
+        skip = self.to_rgb1(out, encoded_style)
 
         i = 1
         for conv1, conv2, noise1, noise2, to_rgb  in zip(
             self.convs[::2], self.convs[1::2], noise[1::2], noise[2::2], self.to_rgbs#, self.to_silhouettes
         ):
-            out = conv1(out, latent[i], noise=noise1)
-            out = conv2(out, latent[i + 1], noise=noise2)
-            skip = to_rgb(out, latent[i + 2], skip)
+            out = conv1(out, encoded_style, noise=noise1)
+            out = conv2(out, encoded_style, noise=noise2)
+            skip = to_rgb(out, encoded_style, skip)
             i += 2
         image = skip
 
-        if return_latents:
-            return image, latent
-        else:
-            return image, None
+        return image, None
 
 
 class ConvLayer(nn.Sequential):
