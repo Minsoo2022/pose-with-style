@@ -143,7 +143,7 @@ def generate(args, loader, g_ema, device):
         input_image = data['input_image'].float().to(device)
         flow = data['flow'].float().to(device)
         sil = data['target_sil'].float().to(device)
-        # feature = data['feature'].float().to(device)
+        feature = data['feature'].float().to(device)
         pred_img_ori = data['pred_image'].float().to(device)
         # attention = data['attention'].float().to(device)
         # attention = F.interpolate(attention, size=(args.size, args.size), mode='bilinear', align_corners=True)
@@ -181,7 +181,7 @@ def generate(args, loader, g_ema, device):
         with torch.no_grad():
             g_ema.eval()
             sample, _ = g_ema(appearance=appearance, flow=flow,
-                              sil=sil, input_feat=pred_img_ori,
+                              sil=sil, input_img=pred_img_ori, input_feat=feature,
                               condition=pred_img
                               )
 
