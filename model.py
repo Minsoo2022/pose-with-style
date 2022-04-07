@@ -472,10 +472,10 @@ class ToRGB(nn.Module):
             self.upsample = Upsample(blur_kernel)
 
         if spatial:
-            self.conv = SpatiallyModulatedConv2d(in_channel, 3, 1)
+            self.conv = SpatiallyModulatedConv2d(in_channel, 4, 1)
         else:
-            self.conv = ModulatedConv2d(in_channel, 3, 1, style_dim, demodulate=False)
-        self.bias = nn.Parameter(torch.zeros(1, 3, 1, 1))
+            self.conv = ModulatedConv2d(in_channel, 4, 1, style_dim, demodulate=False)
+        self.bias = nn.Parameter(torch.zeros(1, 4, 1, 1))
 
     def forward(self, input, style, skip=None):
         out = self.conv(input, style)
@@ -514,7 +514,7 @@ class InputEncoder(nn.Module):
     def __init__(self, ngf=64, blur_kernel=[1, 3, 3, 1], size=256):
         super().__init__()
         self.size = size
-        input_ch = 3
+        input_ch = 3 + 3
         convs = [ConvLayer(input_ch, ngf, 1)]
 
         if size == 128:
@@ -832,6 +832,7 @@ class Generator(nn.Module):
         sil,
         input_img,
         input_feat,
+        warped_img,
         condition,
         styles=None,
         return_latents=False,
@@ -843,7 +844,7 @@ class Generator(nn.Module):
         randomize_noise=True,
     ):
 
-
+        input_img_concat = torch.cat([input_img, warped_img], dim=1)
         styles = self.appearance_encoder(appearance, flow, sil, condition)
 
         if noise is None:
@@ -864,7 +865,7 @@ class Generator(nn.Module):
         for i in range(length):
             latent += [styles[i+1],styles[i+1]]
 
-        out = self.input_encoder(input_img, input_feat)
+        out = self.input_encoder(input_img_concat, input_feat)
         out = self.conv1(out, latent[0], noise=noise[0])
         skip = self.to_rgb1(out, latent[1])
 
@@ -876,12 +877,13 @@ class Generator(nn.Module):
             out = conv2(out, latent[i + 1], noise=noise2)
             skip = to_rgb(out, latent[i + 2], skip)
             i += 2
-        image = skip
+        composition_mask = skip[:, -1:].sigmoid()
+        image = skip[:, :3] * (1 - composition_mask) + warped_img * composition_mask
 
         if return_latents:
             return image, latent
         else:
-            return image, None
+            return image, composition_mask
 
 
 class ConvLayer(nn.Sequential):
@@ -966,7 +968,7 @@ class Discriminator(nn.Module):
             1024: 16 * channel_multiplier,
         }
 
-        convs = [ConvLayer(6, channels[size], 1)]
+        convs = [ConvLayer(6+3, channels[size], 1)]
 
         log_size = int(math.log(size, 2))
 
@@ -991,7 +993,6 @@ class Discriminator(nn.Module):
         )
 
     def forward(self, input, condition):
-        condition = torch.nn.functional.interpolate(condition, size=(self.size, self.size), mode='bilinear', align_corners=True)
         input = torch.cat([input, condition], 1)
         out = self.convs(input)
 

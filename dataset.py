@@ -124,10 +124,10 @@ class DeepFashionDataset(Dataset):
             self.pairs.append([model_id_list[3], 180, 0])
             # self.pairs.append([model_id_list[4], 180, 0])
             # self.pairs.append([model_id_list[5], 180, 0])
-            self.pairs.append([model_id_list[-1], 0, 180])
-            self.pairs.append([model_id_list[-2], 0, 180])
-            self.pairs.append([model_id_list[-3], 0, 180])
-            self.pairs.append([model_id_list[-4], 180, 0])
+            self.pairs.append([model_id_list[54], 0, 180]) # 54 583
+            self.pairs.append([model_id_list[58], 0, 180]) # 58 637
+            self.pairs.append([model_id_list[76], 0, 180]) # 76 825
+            self.pairs.append([model_id_list[96], 180, 0]) # 96 984
             # self.pairs.append([model_id_list[-5], 180, 0])
             # self.pairs.append([model_id_list[-6], 180, 0])
 

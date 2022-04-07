@@ -185,6 +185,8 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
         val_real_img = val_real_img * val_sil
         val_source_sil = val_data['input_sil'].float().to(device)
         val_pred_img = F.interpolate(val_pred_img_ori, size=(args.size, args.size), mode='nearest')
+        val_warped_img = F.grid_sample(val_input_image, val_flow.permute(0, 2, 3, 1))
+        val_fliped_img = (val_input_image * val_source_sil).flip(-1)
 
         if args.finetune:
             val_appearance = torch.cat([val_input_image, val_source_sil], 1)
@@ -208,6 +210,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             #todo flow 배경부분에 왜 값이 있는지 확인 0.0039정도 있음
             flow = F.interpolate(flow, args.size)
             pred_img = F.interpolate(pred_img_ori, size=(args.size, args.size), mode='nearest')
+
 
             if args.faceloss:
                 FT = data['TargetFaceTransform'].float().to(device)
@@ -233,19 +236,21 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             else:
                 appearance = torch.cat([input_image * source_sil, source_sil], 1)
 
+            warped_img = F.grid_sample(input_image, flow.permute(0, 2, 3, 1))
+            fliped_img = (input_image * source_sil).flip(-1)
 
             ############ Optimize Discriminator ############
             requires_grad(generator, False)
             requires_grad(discriminator, True)
 
-            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, input_img=pred_img_ori, input_feat=feature, condition=pred_img)
+            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, input_img=pred_img_ori, input_feat=feature, warped_img=warped_img, condition=pred_img)
             fake_img = fake_img * sil
 
             #todo 디스크리미네이터 어떤걸 concat할지
             # fake_pred = discriminator(fake_img, condition=input_image * source_sil)
             # real_pred = discriminator(real_img, condition=input_image * source_sil)
-            fake_pred = discriminator(fake_img, condition=pred_img)
-            real_pred = discriminator(real_img, condition=pred_img)
+            fake_pred = discriminator(fake_img, condition=torch.cat([pred_img, fliped_img], dim=1))
+            real_pred = discriminator(real_img, condition=torch.cat([pred_img, fliped_img], dim=1))
             d_loss = d_logistic_loss(real_pred, fake_pred)
 
             loss_dict["d"] = d_loss
@@ -262,7 +267,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             if d_regularize:
                 real_img.requires_grad = True
                 # real_pred = discriminator(real_img, condition=input_image * source_sil)
-                real_pred = discriminator(real_img, condition=pred_img)
+                real_pred = discriminator(real_img, condition=torch.cat([pred_img, fliped_img], dim=1))
                 r1_loss = d_r1_loss(real_pred, real_img)
 
                 discriminator.zero_grad()
@@ -277,18 +282,20 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             requires_grad(generator, True)
             requires_grad(discriminator, False)
 
-            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, input_img=pred_img_ori, input_feat=feature, condition=pred_img)
+            fake_img, _ = generator(appearance=appearance, flow=flow, sil=sil, input_img=pred_img_ori, input_feat=feature, warped_img=warped_img, condition=pred_img)
             fake_img = fake_img * sil
 
             # fake_pred = discriminator(fake_img, condition=input_image * source_sil)
-            fake_pred = discriminator(fake_img, condition=pred_img)
+            fake_pred = discriminator(fake_img, condition=torch.cat([pred_img, fliped_img], dim=1))
             g_loss = g_nonsaturating_loss(fake_pred)
 
             loss_dict["g"] = g_loss
 
             ## reconstruction loss: L1 and VGG loss + face identity loss
+
             g_l1 = criterionL1(fake_img, real_img)
-            g_loss += g_l1
+            if False:
+                g_loss += g_l1
             g_vgg = criterionVGG(fake_img, real_img)
             g_loss += g_vgg
 
@@ -352,8 +359,8 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                     with torch.no_grad():
                         model_id_name = '_'.join([str(a) for a in data['model_id']])
                         g_ema.eval()
-                        sample, _ = g_ema(appearance=appearance[:args.n_sample], flow=flow[:args.n_sample],
-                                          sil=sil[:args.n_sample], input_img=pred_img_ori[:args.n_sample], input_feat=feature[:args.n_sample],
+                        sample, composition_mask = g_ema(appearance=appearance[:args.n_sample], flow=flow[:args.n_sample],
+                                          sil=sil[:args.n_sample], input_img=pred_img_ori[:args.n_sample], input_feat=feature[:args.n_sample], warped_img=warped_img[:args.n_sample],
                                           condition=pred_img[:args.n_sample])
                         sample = sample * sil
                         utils.save_image(
@@ -384,7 +391,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                             normalize=True,
                             range=(-1, 1),
                         )
-                        warped_img = F.grid_sample(input_image, flow.permute(0,2,3,1))
+                        # warped_img = F.grid_sample(input_image, flow.permute(0,2,3,1))
                         utils.save_image(
                             warped_img[:args.n_sample],
                             os.path.join('sample', args.name, f"epoch_{str(epoch)}_iter_{str(i)}_warped_{model_id_name}.png"),
@@ -393,12 +400,18 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                             range=(-1, 1),
                         )
 
+                        utils.save_image(
+                            composition_mask[:args.n_sample],
+                            os.path.join('sample', args.name,
+                                         f"epoch_{str(epoch)}_iter_{str(i)}_commask_{model_id_name}.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                        )
+
 
                         val_model_id_name = '_'.join([str(a) for a in val_data['model_id']])
                         torch.cuda.empty_cache()
-
-                        sample, _ = g_ema(appearance=val_appearance, flow=val_flow,
-                                          sil=val_sil, input_img=val_pred_img_ori, input_feat=val_feature,
+                        sample, composition_mask = g_ema(appearance=val_appearance, flow=val_flow,
+                                          sil=val_sil, input_img=val_pred_img_ori, input_feat=val_feature, warped_img=val_warped_img,
                                           condition=val_pred_img)
                         sample = sample * val_sil
                         utils.save_image(
@@ -407,6 +420,12 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                             nrow=int(args.n_sample ** 0.5),
                             normalize=True,
                             range=(-1, 1),
+                        )
+                        utils.save_image(
+                            composition_mask,
+                            os.path.join('sample', args.name, 'val',
+                                         f"epoch_{str(epoch)}_iter_{str(i)}_commask.png"),
+                            nrow=int(args.n_sample ** 0.5),
                         )
                         if i == 0:
                             utils.save_image(
@@ -433,7 +452,6 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                                 normalize=True,
                                 range=(-1, 1),
                             )
-                            val_warped_img = F.grid_sample(val_input_image, val_flow.permute(0, 2, 3, 1))
                             utils.save_image(
                                 val_warped_img,
                                 os.path.join('sample', args.name, 'val',
@@ -442,6 +460,8 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
                                 normalize=True,
                                 range=(-1, 1),
                             )
+
+
 
                 # if i % 5000 == 0:
                 #     torch.save(
