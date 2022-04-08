@@ -383,6 +383,9 @@ class InferenceDataset(Dataset):
         attention_fpath = os.path.join(
             self.path, 'output_stage1', data_item,
             'attention/%04d_%04d.png' % (source_view_id, target_view_id))
+        feature_fpath = os.path.join(
+            self.path, 'output_stage1', data_item,
+            'feature/%s/%04d_%04d.npy' % (str(128), source_view_id, target_view_id))
         target_msk_fpath = os.path.join(
             self.path, 'output_stage1', data_item,
             'weight_sum/%04d_%04d.png' % (source_view_id, target_view_id))
@@ -392,9 +395,10 @@ class InferenceDataset(Dataset):
             pred_image = Image.open(pred_image_fpath)
             # attention = Image.open(attention_fpath)
             target_msk = Image.open(target_msk_fpath)
+            feature = np.load(feature_fpath)
         except:
             raise RuntimeError('Failed to load stage1 output: ' + flow_fpath)
-        return flow, pred_image, None, target_msk
+        return flow, pred_image, feature, target_msk
 
 
     def __getitem__(self, index):
@@ -404,7 +408,7 @@ class InferenceDataset(Dataset):
 
 
         input_image, silhouette1 = self.load_image(model_id)
-        flow, pred_image, attention, silhouette2 = self.load_stage1_output(model_id, source_view_id, target_view_id)
+        flow, pred_image, feature, silhouette2 = self.load_stage1_output(model_id, source_view_id, target_view_id)
 
         # Transform
         input_image = self.transform(input_image)
@@ -430,6 +434,7 @@ class InferenceDataset(Dataset):
         return {'input_image':input_image, 'pred_image': pred_image, # 'attention': attention,
                 'target_sil': target_sil,
                 'flow': flow,
+                'feature': feature,
                 'input_sil': silhouette1,
                 'save_name':save_name,
                 'model_id': model_id,

@@ -178,12 +178,13 @@ def generate(args, loader, g_ema, device):
                 appearance = torch.cat([input_image * source_sil, source_sil], 1)
             else:
                 appearance = torch.cat([input_image * source_sil, source_sil], 1)
+
+        warped_img = F.grid_sample(input_image, flow.permute(0, 2, 3, 1))
+        fliped_img = (input_image * source_sil).flip(-1)
         with torch.no_grad():
             g_ema.eval()
-            sample, _ = g_ema(appearance=appearance, flow=flow,
-                              sil=sil, input_img=pred_img_ori, input_feat=feature,
-                              condition=pred_img
-                              )
+            sample, composition_mask = g_ema(appearance=appearance, flow=flow, sil=sil, input_img=pred_img_ori, input_feat=feature,
+                      warped_img=warped_img, condition=pred_img)
 
 
             save_path = os.path.join(args.path, 'output_stage2', '/'.join([args.ckpt.split('/')[-2], args.ckpt.split('/')[-1][:-3]]))
@@ -207,6 +208,11 @@ def generate(args, loader, g_ema, device):
                                  f"{data['source_view_id'][j]}_{data['target_view_id'][j]}_coarse.png"),
                 )
 
+                utils.save_image(
+                    (composition_mask[j]) * sil[j] + (1 - sil[j]),
+                    os.path.join(os.path.join(save_path, data['model_id'][j]),
+                                 f"{data['source_view_id'][j]}_{data['target_view_id'][j]}_commask.png"),
+                )
 
 
 if __name__ == "__main__":
