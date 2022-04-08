@@ -959,7 +959,7 @@ class Discriminator(nn.Module):
             1024: 16 * channel_multiplier,
         }
 
-        convs = [ConvLayer(6 + 3, channels[size], 1)]
+        convs = [ConvLayer(6, channels[size], 1)]
 
         log_size = int(math.log(size, 2))
 
