@@ -184,6 +184,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
         val_real_img = val_real_img * val_sil
         val_source_sil = val_data['input_sil'].float().to(device)
         val_pred_img = F.interpolate(val_pred_img_ori, size=(args.size, args.size), mode='nearest')
+        val_fliped_img = (val_input_image * val_source_sil).flip(-1)
 
         if args.finetune:
             val_appearance = torch.cat([val_input_image, val_source_sil], 1)
@@ -231,6 +232,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             else:
                 appearance = torch.cat([input_image * source_sil, source_sil], 1)
 
+            fliped_img = (input_image * source_sil).flip(-1)
 
             ############ Optimize Discriminator ############
             requires_grad(generator, False)
@@ -242,8 +244,8 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             #todo 디스크리미네이터 어떤걸 concat할지
             # fake_pred = discriminator(fake_img, condition=input_image * source_sil)
             # real_pred = discriminator(real_img, condition=input_image * source_sil)
-            fake_pred = discriminator(fake_img, condition=pred_img)
-            real_pred = discriminator(real_img, condition=pred_img)
+            fake_pred = discriminator(fake_img, condition=torch.cat([pred_img, fliped_img], dim=1))
+            real_pred = discriminator(real_img, condition=torch.cat([pred_img, fliped_img], dim=1))
             d_loss = d_logistic_loss(real_pred, fake_pred)
 
             loss_dict["d"] = d_loss
@@ -260,7 +262,7 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             if d_regularize:
                 real_img.requires_grad = True
                 # real_pred = discriminator(real_img, condition=input_image * source_sil)
-                real_pred = discriminator(real_img, condition=pred_img)
+                real_pred = discriminator(real_img, condition=torch.cat([pred_img, fliped_img], dim=1))
                 r1_loss = d_r1_loss(real_pred, real_img)
 
                 discriminator.zero_grad()
@@ -279,14 +281,14 @@ def train(args, loader, sampler, generator, discriminator, g_optim, d_optim, g_e
             fake_img = fake_img * sil
 
             # fake_pred = discriminator(fake_img, condition=input_image * source_sil)
-            fake_pred = discriminator(fake_img, condition=pred_img)
+            fake_pred = discriminator(fake_img, condition=torch.cat([pred_img, fliped_img], dim=1))
             g_loss = g_nonsaturating_loss(fake_pred)
 
             loss_dict["g"] = g_loss
 
             ## reconstruction loss: L1 and VGG loss + face identity loss
             g_l1 = criterionL1(fake_img, real_img)
-            g_loss += g_l1
+            # g_loss += g_l1
             g_vgg = criterionVGG(fake_img, real_img)
             g_loss += g_vgg
 
