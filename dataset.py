@@ -54,7 +54,7 @@ class DeepFashionDataset(Dataset):
 
             for model_id in model_id_list:
                 for source_view_id in list(range(0, 360, 18)):
-                    for target_veiw_diff in [180]:
+                    for target_veiw_diff in self.target_view_diff_list:
                         target_view_id = target_veiw_diff + source_view_id
                         if target_view_id >= 360:
                             target_view_id = target_view_id - 360
@@ -106,7 +106,7 @@ class DeepFashionDataset(Dataset):
 
             for model_id in model_id_list:
                 for source_view_id in [0, 90, 180, 270]:
-                    for target_veiw_diff in [180]:
+                    for target_veiw_diff in self.target_view_diff_list:
                         target_view_id = target_veiw_diff + source_view_id
                         if target_view_id >= 360:
                             target_view_id = target_view_id - 360
@@ -118,15 +118,15 @@ class DeepFashionDataset(Dataset):
             with open(os.path.join(self.path,'data_list_test.txt')) as f:
                 id = f.readlines()
             model_id_list = list(map(lambda x: x[:-1] if x.endswith('\n') else x, id))
-            self.pairs.append([model_id_list[0], 0, 180])
+            self.pairs.append([model_id_list[0], 0, 90])
             self.pairs.append([model_id_list[1], 0, 180])
-            self.pairs.append([model_id_list[2], 0, 180])
+            self.pairs.append([model_id_list[2], 0, 270])
             self.pairs.append([model_id_list[3], 180, 0])
             # self.pairs.append([model_id_list[4], 180, 0])
             # self.pairs.append([model_id_list[5], 180, 0])
-            self.pairs.append([model_id_list[54], 0, 180]) # 54 583
+            self.pairs.append([model_id_list[54], 0, 90]) # 54 583
             self.pairs.append([model_id_list[58], 0, 180]) # 58 637
-            self.pairs.append([model_id_list[76], 0, 180]) # 76 825
+            self.pairs.append([model_id_list[76], 0, 270]) # 76 825
             self.pairs.append([model_id_list[96], 180, 0]) # 96 984
             # self.pairs.append([model_id_list[-5], 180, 0])
             # self.pairs.append([model_id_list[-6], 180, 0])

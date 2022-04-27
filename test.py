@@ -222,7 +222,7 @@ if __name__ == "__main__":
 
     # parser.add_argument("--path", type=str, default='/home/nas1_temp/dataset/Thuman', help="path to the lmdb dataset")
     parser.add_argument("--path", type=str, default='/home/nas1_temp/dataset/tt_dataset', help="path to the lmdb dataset")
-    parser.add_argument("--stage1_dir", type=str, default='/home/nas1_temp/dataset/tt_dataset/output_stage1',
+    parser.add_argument("--stage1_dir", type=str, default='/home/nas1_temp/dataset/tt_dataset/output_stage1/0413_4view',
                         help="path to the lmdb dataset")
     parser.add_argument("--batch", type=int, default=4, help="batch sizes for each gpus")
     parser.add_argument("--workers", type=int, default=4, help="batch sizes for each gpus")
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     parser.add_argument("--channel_multiplier", type=int, default=2, help="channel multiplier factor for the model. config-f = 2, else = 1")
     parser.add_argument("--ckpt", type=str, default=None, help="path to the checkpoints to resume training")
     parser.add_argument("--finetune", action="store_true", help="finetune to handle background- second step of training.")
-    parser.add_argument("--allview", action="store_true")
+    parser.add_argument("--allview", type=bool, default=True)
     # parser.add_argument("--gpu_ids", type=str, default=0, help="add face loss when faces are detected")
 
     args = parser.parse_args()

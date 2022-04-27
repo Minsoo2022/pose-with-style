@@ -482,7 +482,7 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str, default='/home/nas1_temp/dataset/tt_dataset', help="path to the lmdb dataset")
     # parser.add_argument("--stage1_dir", type=str, default='/home/nas3_userJ/shimgyumin/fasker/research/pamir/networks/results/validation_256gcmroptmask50_gttrans__pamir_nerf_0302_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie_2022_03_06_05_54_57', help="path to the lmdb dataset")
     # parser.add_argument("--stage1_dir", type=str, default='/home/nas1_temp/dataset/Thuman/output_stage1/pamir_nerf_0222_48_03_rayontarget_rayonpts_occ_attloss_inout_24hie', help= "path to the lmdb dataset")
-    parser.add_argument("--stage1_dir", type=str, default='/home/nas1_temp/dataset/tt_dataset/output_stage1/0329_test', help= "path to the lmdb dataset")
+    parser.add_argument("--stage1_dir", type=str, default='/home/nas1_temp/dataset/tt_dataset/output_stage1/0413_4view', help= "path to the lmdb dataset")
     parser.add_argument("--name", type=str, default='test', help="name of experiment")
     parser.add_argument("--epoch", type=int, default=200, help="total training epochs")
     parser.add_argument("--batch", type=int, default=1, help="batch sizes for each gpus")
@@ -605,8 +605,8 @@ if __name__ == "__main__":
             broadcast_buffers=False,
         )
 
-    dataset = DeepFashionDataset(args.path, args.stage1_dir, 'train', args.size, args.vol_feat_res)
-    val_dataset = DeepFashionDataset(args.path, args.stage1_dir, 'val', args.size, args.vol_feat_res)
+    dataset = DeepFashionDataset(args.path, args.stage1_dir, 'train', args.size, vol_feat_res=args.vol_feat_res, all_view=True)
+    val_dataset = DeepFashionDataset(args.path, args.stage1_dir, 'val', args.size, vol_feat_res=args.vol_feat_res, all_view=True)
     sampler = data_sampler(dataset, shuffle=True, distributed=args.distributed)
     loader = data.DataLoader(
         dataset,
